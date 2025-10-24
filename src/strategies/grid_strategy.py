@@ -150,15 +150,15 @@ class GridStrategy(BaseStrategy):
         # Check Bollinger Band width (should be relatively narrow)
         bbands = TechnicalIndicators.calculate_bollinger_bands(df, self.bb_period, self.bb_std)
         if bbands is not None:
-            upper = bbands[f'BBU_{self.bb_period}_{self.bb_std}'].iloc[-1]
-            lower = bbands[f'BBL_{self.bb_period}_{self.bb_std}'].iloc[-1]
+            upper = bbands[f'BBU_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
+            lower = bbands[f'BBL_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
             bb_width = ((upper - lower) / current_price) * 100
             
             # Historical BB width
             bb_width_history = []
             for i in range(min(50, len(bbands))):
-                u = bbands[f'BBU_{self.bb_period}_{self.bb_std}'].iloc[-(i+1)]
-                l = bbands[f'BBL_{self.bb_period}_{self.bb_std}'].iloc[-(i+1)]
+                u = bbands[f'BBU_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-(i+1)]
+                l = bbands[f'BBL_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-(i+1)]
                 p = df['close'].iloc[-(i+1)]
                 bb_width_history.append(((u - l) / p) * 100)
             
@@ -176,8 +176,8 @@ class GridStrategy(BaseStrategy):
         bbands = TechnicalIndicators.calculate_bollinger_bands(df, self.bb_period, self.bb_std)
         
         if bbands is not None:
-            upper_bound = bbands[f'BBU_{self.bb_period}_{self.bb_std}'].iloc[-1]
-            lower_bound = bbands[f'BBL_{self.bb_period}_{self.bb_std}'].iloc[-1]
+            upper_bound = bbands[f'BBU_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
+            lower_bound = bbands[f'BBL_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
         else:
             # Fallback to recent high/low
             upper_bound = df['high'].iloc[-self.range_period:].max()
@@ -303,8 +303,8 @@ class GridStrategy(BaseStrategy):
         if bbands is None:
             return False
         
-        upper_band = bbands[f'BBU_{self.bb_period}_{self.bb_std}'].iloc[-1]
-        lower_band = bbands[f'BBL_{self.bb_period}_{self.bb_std}'].iloc[-1]
+        upper_band = bbands[f'BBU_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
+        lower_band = bbands[f'BBL_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
         
         # Breakout if price closes significantly outside bands with volume
         if current_price > upper_band * 1.03 or current_price < lower_band * 0.97:

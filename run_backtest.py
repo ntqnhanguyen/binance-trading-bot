@@ -49,7 +49,7 @@ def main():
     # Load historical data
     print("Loading historical data...")
     for symbol in args.symbols:
-        csv_file = f"{args.data_dir}/{symbol}_15m.csv"
+        csv_file = f"{args.data_dir}/{symbol}_5m.csv"
         try:
             backtester.load_data_from_csv(symbol, csv_file)
             print(f"  ✓ Loaded {symbol}")

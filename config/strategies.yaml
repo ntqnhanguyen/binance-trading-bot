@@ -41,7 +41,7 @@ strategies:
   
   # Grid Strategy
   grid:
-    enabled: false
+    enabled: true
     capital_allocation: 0.15  # 15% of capital
     num_grids: 10
     grid_spacing_pct: 1.0  # % spacing between grids

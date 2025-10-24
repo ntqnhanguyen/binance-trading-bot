@@ -4,7 +4,7 @@ Technical indicators for trading strategies
 import pandas as pd
 import numpy as np
 import pandas_ta as ta
-
+from typing import  Dict, List
 
 class TechnicalIndicators:
     """Collection of technical indicators"""

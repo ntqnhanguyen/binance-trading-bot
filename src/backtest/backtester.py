@@ -66,7 +66,6 @@ class Backtester:
             (df.index >= self.start_date) & 
             (df.index <= self.end_date)
         ].copy()
-        
         # Add technical indicators
         df_filtered = add_all_indicators(df_filtered)
         

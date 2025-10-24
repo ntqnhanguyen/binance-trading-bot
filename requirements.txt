@@ -2,11 +2,11 @@
 python-binance==1.0.19
 
 # Data processing
-pandas==2.1.4
-numpy==1.26.2
+pandas==2.3.2
+numpy==2.2.6
 
-# Technical indicators
-pandas-ta==0.3.14b0
+# Technical indicators (fork ổn định)
+pandas-ta==0.4.71b0
 
 # Configuration
 pyyaml==6.0.1
@@ -22,4 +22,3 @@ pytest-asyncio==0.21.1
 # Utilities
 python-dateutil==2.8.2
 pytz==2023.3
-

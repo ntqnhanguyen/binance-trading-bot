@@ -186,9 +186,8 @@ class MeanReversionStrategy(BaseStrategy):
         
         if bbands is None:
             return None
-        
         rsi = df[f'RSI_{self.rsi_period}'].iloc[-1]
-        lower_band = bbands[f'BBL_{self.bb_period}_{self.bb_std}'].iloc[-1]
+        lower_band = bbands[f'BBL_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
         
         # Both conditions must be met
         rsi_oversold = rsi < self.rsi_oversold
@@ -207,8 +206,8 @@ class MeanReversionStrategy(BaseStrategy):
         if bbands is None:
             return False
         
-        upper_band = bbands[f'BBU_{self.bb_period}_{self.bb_std}'].iloc[-1]
-        lower_band = bbands[f'BBL_{self.bb_period}_{self.bb_std}'].iloc[-1]
+        upper_band = bbands[f'BBU_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
+        lower_band = bbands[f'BBL_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
         
         # Breakout if price closes significantly outside bands
         if current_price > upper_band * 1.05 or current_price < lower_band * 0.95:
@@ -237,7 +236,7 @@ class MeanReversionStrategy(BaseStrategy):
         # Take profit at midline
         bbands = TechnicalIndicators.calculate_bollinger_bands(df, self.bb_period, self.bb_std)
         if bbands is not None:
-            take_profit = bbands[f'BBM_{self.bb_period}_{self.bb_std}'].iloc[-1]
+            take_profit = bbands[f'BBM_{self.bb_period}_{self.bb_std}_{self.bb_std}'].iloc[-1]
         else:
             # Fallback to R:R ratio
             take_profit = self.risk_manager.calculate_take_profit(
