@@ -1,0 +1,28 @@
+# Risk Management Configuration
+
+risk:
+  # Maximum risk per trade (as fraction of capital)
+  max_risk_per_trade: 0.005  # 0.5%
+  
+  # Maximum daily loss (as fraction of capital)
+  max_daily_loss: 0.02  # 2%
+  
+  # Maximum weekly loss (as fraction of capital)
+  max_weekly_loss: 0.05  # 5%
+  
+  # Minimum cash reserve (as fraction of total capital)
+  min_cash_reserve: 0.30  # 30%
+  
+  # Maximum number of concurrent positions
+  max_positions: 7
+  
+  # Maximum strategies per trading pair
+  max_strategies_per_pair: 2
+  
+  # Circuit breaker settings
+  circuit_breaker:
+    enabled: true
+    daily_loss_trigger: 0.02  # 2%
+    weekly_loss_trigger: 0.05  # 5%
+    cooldown_hours: 24
+

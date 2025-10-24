@@ -1,0 +1,33 @@
+# General Trading Configuration
+
+trading:
+  # Trading symbols (pairs to trade)
+  symbols:
+    - BTCUSDT
+    - ETHUSDT
+    - BNBUSDT
+  
+  # Trading interval in seconds (300 = 5 minutes)
+  interval: 300
+  
+  # Timeframe for analysis
+  timeframe: 15m
+  
+  # Number of candles to fetch
+  lookback_periods: 200
+
+# Backtest Configuration
+backtest:
+  initial_capital: 10000.0
+  start_date: "2023-01-01"
+  end_date: "2023-12-31"
+  commission: 0.001  # 0.1% per trade
+
+# Logging Configuration
+logging:
+  level: INFO
+  log_to_file: true
+  log_to_console: true
+  max_file_size_mb: 10
+  backup_count: 5
+

@@ -1,0 +1,212 @@
+================================================================================
+HƯỚNG DẪN NHANH LẤY BINANCE API KEYS
+================================================================================
+
+📌 KHUYẾN NGHỊ: BẮT ĐẦU VỚI TESTNET
+================================================================================
+
+OPTION 1: TESTNET (AN TOÀN, MIỄN PHÍ, KHUYẾN NGHỊ)
+--------------------------------------------------------------------------------
+✓ Hoàn toàn miễn phí
+✓ Tiền ảo để test
+✓ Không rủi ro
+✓ Giống mainnet
+
+BƯỚC 1: Truy cập Testnet
+→ https://testnet.binance.vision/
+
+BƯỚC 2: Đăng nhập
+→ Click "GitHub" để đăng nhập bằng GitHub account
+
+BƯỚC 3: Tạo API Key
+→ Click vào email/username (góc phải)
+→ Chọn "API Keys"
+→ Click "Generate HMAC_SHA256 Key"
+→ Đặt tên: "TradingBot"
+
+BƯỚC 4: Copy Keys
+→ Copy API Key
+→ Copy Secret Key
+
+BƯỚC 5: Cấu hình .env
+Mở file .env và thêm:
+
+BINANCE_TESTNET_API_KEY=paste_your_api_key_here
+BINANCE_TESTNET_API_SECRET=paste_your_secret_here
+TRADING_MODE=testnet
+
+BƯỚC 6: Test kết nối
+python test_api.py
+
+✓ Xong! Bạn có thể bắt đầu test bot trên testnet
+
+
+================================================================================
+
+OPTION 2: MAINNET (GIAO DỊCH THẬT - CẨN THẬN!)
+--------------------------------------------------------------------------------
+⚠️ CHỈ SỬ DỤNG SAU KHI ĐÃ TEST KỸ TRÊN TESTNET!
+⚠️ ĐÂY LÀ TIỀN THẬT, CÓ THỂ MẤT TOÀN BỘ!
+
+BƯỚC 1: Đăng nhập Binance
+→ https://www.binance.com
+
+BƯỚC 2: Vào API Management
+→ Hover vào icon profile (góc phải)
+→ Click "API Management"
+
+BƯỚC 3: Tạo API Key
+→ Nhập label: "TradingBot"
+→ Click "Create API"
+→ Xác thực bằng 2FA/Email
+
+BƯỚC 4: Cấu hình quyền (QUAN TRỌNG!)
+→ ✅ Enable Spot & Margin Trading (BẬT)
+→ ❌ Enable Withdrawals (TẮT - RẤT QUAN TRỌNG!)
+→ ❌ Enable Futures (Tắt)
+
+BƯỚC 5: IP Whitelist (Khuyến nghị)
+→ Click "Edit restrictions"
+→ Chọn "Restrict access to trusted IPs only"
+→ Thêm IP của máy chạy bot
+→ (Bỏ qua nếu IP động, nhưng ít an toàn hơn)
+
+BƯỚC 6: Copy Keys
+→ Copy API Key
+→ Copy Secret Key
+→ LƯU Ý: Secret chỉ hiện 1 lần!
+
+BƯỚC 7: Cấu hình .env
+Mở file .env và thêm:
+
+BINANCE_API_KEY=paste_your_api_key_here
+BINANCE_API_SECRET=paste_your_secret_here
+TRADING_MODE=mainnet
+
+BƯỚC 8: Test kết nối
+python test_api.py
+
+BƯỚC 9: BẮT ĐẦU NHỎ!
+→ Dùng vốn nhỏ lúc đầu
+→ Theo dõi thường xuyên
+→ Tăng dần khi đã ổn định
+
+
+================================================================================
+
+KIỂM TRA KẾT NỐI API
+================================================================================
+
+Sau khi cấu hình .env, chạy:
+
+make test-api
+
+Hoặc:
+
+python test_api.py
+
+Kết quả mong đợi:
+✓ Server time
+✓ Account access
+✓ Balances
+✓ Market data
+✓ Historical data
+✓ ALL TESTS PASSED!
+
+
+================================================================================
+
+CÁC CHẾ ĐỘ TRADING
+================================================================================
+
+1. BACKTEST (Không cần API key)
+   TRADING_MODE=backtest
+   → Test với dữ liệu lịch sử
+   → Hoàn toàn offline
+
+2. PAPER (Cần API key để lấy dữ liệu)
+   TRADING_MODE=paper
+   → Giả lập giao dịch
+   → Dữ liệu thời gian thực
+   → Không đặt lệnh thật
+
+3. TESTNET (Cần Testnet API key)
+   TRADING_MODE=testnet
+   → Giao dịch với tiền ảo
+   → Đặt lệnh thật trên testnet
+   → An toàn 100%
+
+4. MAINNET (Cần Mainnet API key)
+   TRADING_MODE=mainnet
+   → GIAO DỊCH THẬT
+   → TIỀN THẬT
+   → RỦI RO THẬT
+
+
+================================================================================
+
+BẢO MẬT API KEYS
+================================================================================
+
+✓ KHÔNG commit .env vào Git
+✓ TẮT quyền Withdrawals
+✓ BẬT IP Whitelist nếu có thể
+✓ Dùng API key riêng cho bot
+✓ Thay đổi key định kỳ (3-6 tháng)
+✓ Theo dõi hoạt động API trên Binance
+✓ Lưu keys an toàn
+
+
+================================================================================
+
+TROUBLESHOOTING
+================================================================================
+
+LỖI: "Invalid API-key"
+→ Kiểm tra đã copy đúng key chưa
+→ Kiểm tra không có khoảng trắng thừa
+→ Kiểm tra đang dùng đúng key (testnet/mainnet)
+
+LỖI: "IP not whitelisted"
+→ Thêm IP vào whitelist
+→ Hoặc tắt IP whitelist
+
+LỖI: "Timestamp for this request"
+→ Đồng bộ thời gian hệ thống
+→ Linux/Mac: sudo ntpdate -s time.nist.gov
+
+LỖI: "Permission denied"
+→ Kiểm tra đã bật "Spot Trading" chưa
+→ Kiểm tra API key chưa bị disable
+
+
+================================================================================
+
+HỖ TRỢ
+================================================================================
+
+Chi tiết đầy đủ: Xem ENV_SETUP.md
+Test API: python test_api.py
+Logs: tail -f logs/trading_bot.log
+
+Nếu gặp vấn đề:
+1. Đọc ENV_SETUP.md
+2. Chạy test_api.py
+3. Kiểm tra logs
+4. Tạo issue trên GitHub
+
+
+================================================================================
+BẮT ĐẦU NGAY!
+================================================================================
+
+1. make setup-env          # Tạo file .env
+2. [Chỉnh sửa .env]        # Thêm API keys
+3. make test-api           # Test kết nối
+4. make download-data      # Tải dữ liệu (cho backtest)
+5. make backtest           # Chạy backtest
+6. make run                # Chạy bot
+
+Chúc bạn thành công! 🚀
+================================================================================
+
