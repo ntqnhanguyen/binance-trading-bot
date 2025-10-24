@@ -1,0 +1,169 @@
+================================================================================
+GITHUB REPOSITORY INFORMATION
+================================================================================
+
+Repository URL:
+https://github.com/ntqnhanguyen/binance-trading-bot
+
+Clone URL (HTTPS):
+https://github.com/ntqnhanguyen/binance-trading-bot.git
+
+Clone URL (SSH):
+git@github.com:ntqnhanguyen/binance-trading-bot.git
+
+================================================================================
+
+CLONE REPOSITORY
+================================================================================
+
+# Clone with HTTPS
+git clone https://github.com/ntqnhanguyen/binance-trading-bot.git
+cd binance-trading-bot
+
+# Clone with SSH
+git clone git@github.com:ntqnhanguyen/binance-trading-bot.git
+cd binance-trading-bot
+
+================================================================================
+
+QUICK START AFTER CLONE
+================================================================================
+
+1. Install dependencies:
+   pip install -r requirements.txt
+
+2. Setup environment:
+   make setup-env
+   # Edit .env file with your API keys
+
+3. Test API connection:
+   make test-api
+
+4. Download historical data:
+   make download-data
+
+5. Run backtest:
+   make backtest
+
+6. Run bot:
+   make run
+
+================================================================================
+
+REPOSITORY TOPICS
+================================================================================
+
+- binance
+- trading-bot
+- cryptocurrency
+- algorithmic-trading
+- python
+- backtesting
+- risk-management
+- docker
+- spot-trading
+- technical-analysis
+
+================================================================================
+
+PROJECT STRUCTURE
+================================================================================
+
+binance-trading-bot/
+├── src/                    # Source code
+│   ├── core/              # Exchange, Portfolio
+│   ├── strategies/        # 4 trading strategies
+│   ├── risk/              # Risk management
+│   ├── indicators/        # Technical indicators
+│   ├── orchestrator/      # Strategy coordination
+│   ├── backtest/          # Backtesting engine
+│   └── utils/             # Utilities
+├── config/                # YAML configurations
+├── docs/                  # Documentation
+├── main.py               # Main entry point
+├── run_backtest.py       # Backtest script
+├── download_data.py      # Data downloader
+├── test_api.py           # API connection tester
+├── Dockerfile            # Docker configuration
+├── docker-compose.yml    # Docker Compose
+└── README.md             # Main documentation
+
+================================================================================
+
+FEATURES
+================================================================================
+
+✓ 4 Trading Strategies:
+  - DCA (Dollar-Cost Averaging)
+  - Trend Following
+  - Mean Reversion
+  - Grid Trading
+
+✓ Risk Management:
+  - Circuit Breaker
+  - Stop-Loss & Take-Profit
+  - Position sizing
+  - Risk limits
+
+✓ 4 Operating Modes:
+  - Backtest
+  - Testnet
+  - Paper Trading
+  - Mainnet (Real)
+
+✓ Comprehensive Logging
+✓ Docker Support
+✓ Full Documentation
+
+================================================================================
+
+DOCUMENTATION
+================================================================================
+
+Main Documentation:
+- README.md: Complete guide
+- QUICKSTART.md: Quick start guide
+- ARCHITECTURE.md: Architecture details
+- ENV_SETUP.md: API keys setup
+- API_KEYS_GUIDE.txt: Quick reference
+
+================================================================================
+
+LICENSE
+================================================================================
+
+MIT License
+
+See LICENSE file for details.
+
+================================================================================
+
+CONTRIBUTING
+================================================================================
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+================================================================================
+
+SUPPORT
+================================================================================
+
+- Issues: https://github.com/ntqnhanguyen/binance-trading-bot/issues
+- Discussions: https://github.com/ntqnhanguyen/binance-trading-bot/discussions
+
+================================================================================
+
+STAR THE REPO ⭐
+================================================================================
+
+If you find this project useful, please star the repository!
+
+https://github.com/ntqnhanguyen/binance-trading-bot
+
+================================================================================
+
