@@ -191,6 +191,24 @@ class Portfolio:
         # Update cash
         self.cash -= position_cost
         
+        # Record entry trade
+        entry_record = {
+            'timestamp': datetime.now().isoformat(),
+            'symbol': symbol,
+            'strategy': strategy,
+            'order_type': 'BUY' if side == 'LONG' else 'SELL',
+            'side': side,
+            'price': entry_price,
+            'quantity': quantity,
+            'value': position_cost,
+            'action': 'OPEN',
+            'pnl': 0.0,
+            'pnl_pct': 0.0,
+            'cumulative_pnl': self.total_pnl,
+            'cash_after': self.cash
+        }
+        self.trade_history.append(entry_record)
+        
         self.logger.info(
             f"Opened {side} position: {symbol} | "
             f"Qty: {quantity} | Price: {entry_price} | "
@@ -261,17 +279,29 @@ class Portfolio:
         else:
             self.losing_trades += 1
         
-        # Record trade
+        # Calculate values
+        exit_value = exit_price * close_qty
+        entry_value = position.entry_price * close_qty
+        pnl_pct = (pnl / entry_value) * 100 if entry_value > 0 else 0.0
+        
+        # Record exit trade
         trade_record = {
             'timestamp': datetime.now().isoformat(),
             'symbol': symbol,
             'strategy': strategy,
+            'order_type': 'SELL' if position.side == 'LONG' else 'BUY',
             'side': position.side,
-            'entry_price': position.entry_price,
-            'exit_price': exit_price,
+            'price': exit_price,
             'quantity': close_qty,
+            'value': exit_value,
+            'action': 'CLOSE',
+            'entry_price': position.entry_price,
+            'entry_value': entry_value,
             'pnl': pnl,
-            'pnl_pct': (pnl / (position.entry_price * close_qty)) * 100
+            'pnl_pct': pnl_pct,
+            'cumulative_pnl': self.total_pnl,
+            'cash_after': self.cash,
+            'win': 1 if pnl > 0 else 0
         }
         self.trade_history.append(trade_record)
         

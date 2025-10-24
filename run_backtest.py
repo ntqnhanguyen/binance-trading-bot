@@ -12,6 +12,7 @@ from src.strategies import (
     GridStrategy
 )
 from src.utils.config import config
+from src.utils.trade_exporter import TradeExporter
 
 
 def main():
@@ -134,12 +135,17 @@ def main():
     equity_curve.to_csv(equity_file)
     print(f"Equity curve saved to: {equity_file}")
     
-    # Save trade history
-    trade_history = backtester.get_trade_history()
-    if not trade_history.empty:
-        trades_file = f"./data/trades_{timestamp}.csv"
-        trade_history.to_csv(trades_file, index=False)
-        print(f"Trade history saved to: {trades_file}")
+    # Save trade history with improved format
+    trade_history = backtester.portfolio.trade_history
+    if trade_history:
+        # Export detailed report
+        report_prefix = f"./data/backtest_{timestamp}"
+        TradeExporter.export_detailed_report(trade_history, report_prefix)
+        
+        # Print summary
+        TradeExporter.print_trade_summary(trade_history)
+    else:
+        print("No trades executed during backtest")
 
 
 if __name__ == '__main__':

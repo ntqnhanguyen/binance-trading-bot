@@ -7,6 +7,7 @@ from typing import Dict
 
 from src.utils.logger import TradingLogger
 from src.utils.config import config
+from src.utils.trade_exporter import TradeExporter
 from src.core.exchange import BinanceExchange
 from src.core.portfolio import Portfolio
 from src.risk.risk_manager import RiskManager
@@ -209,6 +210,13 @@ class TradingBot:
         """Stop the trading bot"""
         self.running = False
         
+        # Export final trade report
+        if self.portfolio.trade_history:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            report_prefix = f"./data/final_trades_{timestamp}"
+            TradeExporter.export_detailed_report(self.portfolio.trade_history, report_prefix)
+            self.logger.info(f"Final trade report exported: {report_prefix}")
+        
         # Print final statistics
         stats = self.portfolio.get_statistics()
         orchestrator_stats = self.orchestrator.get_statistics()
@@ -221,6 +229,10 @@ class TradingBot:
         self.logger.info(f"Total PnL: {stats['total_pnl']:.2f}")
         self.logger.info(f"Open Positions: {stats['open_positions']}")
         self.logger.info("=" * 60)
+        
+        # Print trade summary
+        if self.portfolio.trade_history:
+            TradeExporter.print_trade_summary(self.portfolio.trade_history)
         
         for strategy_name, strategy_stats in orchestrator_stats['strategies'].items():
             self.logger.info(
