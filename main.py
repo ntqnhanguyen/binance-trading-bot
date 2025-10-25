@@ -330,9 +330,10 @@ class HybridTradingBot:
                 else:
                     # Real trading (testnet or mainnet)
                     try:
-                        order_result = self.exchange.place_limit_order(
+                        order_result = self.exchange.create_order(
                             symbol=symbol,
                             side=side,
+                            order_type='LIMIT',
                             quantity=qty,
                             price=price
                         )
