@@ -37,7 +37,7 @@ class HybridTradingBot:
         self.running = False
         
         # Initialize logger
-        self.logger = TradingLogger('HybridBot').get_logger()
+        self.logger = TradingLogger.get_logger('HybridBot')
         
         # Load hybrid strategy config
         with open(hybrid_config_path, 'r') as f:

@@ -33,7 +33,7 @@ class HybridBacktester:
         self.initial_capital = initial_capital
         
         # Initialize logger
-        self.logger = TradingLogger('HybridBacktest').get_logger()
+        self.logger = TradingLogger.get_logger('HybridBacktest')
         
         # Initialize engines
         self.indicator_engine = IndicatorEngine(symbol)
