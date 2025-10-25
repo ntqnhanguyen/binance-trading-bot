@@ -54,7 +54,7 @@ class IndicatorEngine:
         if 'RSI_14' not in self._df.columns:
             rsi_data = TechnicalIndicators.calculate_rsi(self._df, 14)
             if rsi_data is not None:
-                self._df['RSI_14'] = rsi_data['RSI_14']
+                self._df['RSI_14'] = rsi_data
         
         # ATR
         if 'ATR_14' not in self._df.columns:
@@ -62,27 +62,27 @@ class IndicatorEngine:
         
         # EMAs
         if 'EMA_9' not in self._df.columns:
-            ema_data = TechnicalIndicators.calculate_ema(self._df, 9)
+            ema_data = TechnicalIndicators.calculate_ma(self._df, 9, 'EMA')
             if ema_data is not None:
-                self._df['EMA_9'] = ema_data['EMA_9']
+                self._df['EMA_9'] = ema_data
         
         if 'EMA_21' not in self._df.columns:
-            ema_data = TechnicalIndicators.calculate_ema(self._df, 21)
+            ema_data = TechnicalIndicators.calculate_ma(self._df, 21, 'EMA')
             if ema_data is not None:
-                self._df['EMA_21'] = ema_data['EMA_21']
+                self._df['EMA_21'] = ema_data
         
         if 'EMA_50' not in self._df.columns:
-            ema_data = TechnicalIndicators.calculate_ema(self._df, 50)
+            ema_data = TechnicalIndicators.calculate_ma(self._df, 50, 'EMA')
             if ema_data is not None:
-                self._df['EMA_50'] = ema_data['EMA_50']
+                self._df['EMA_50'] = ema_data
         
         # Bollinger Bands
-        if 'BBU_20_2.0_2.0' not in self._df.columns:
+        if 'BBU_20_2.0' not in self._df.columns:
             bb_data = TechnicalIndicators.calculate_bollinger_bands(self._df, 20, 2.0)
-            if bb_data is not None:
-                self._df['BBU_20_2.0_2.0'] = bb_data['BBU_20_2.0_2.0']
-                self._df['BBM_20_2.0_2.0'] = bb_data['BBM_20_2.0_2.0']
-                self._df['BBL_20_2.0_2.0'] = bb_data['BBL_20_2.0_2.0']
+            if bb_data is not None and not bb_data.empty:
+                # pandas_ta returns columns with format BBL_20_2.0, BBM_20_2.0, BBU_20_2.0
+                for col in bb_data.columns:
+                    self._df[col] = bb_data[col]
     
     def _extract_latest_signals(self):
         """Extract latest signals from DataFrame"""
@@ -109,9 +109,9 @@ class IndicatorEngine:
                 'ema_fast': latest.get('EMA_9', close),
                 'ema_mid': latest.get('EMA_21', close),
                 'ema_slow': latest.get('EMA_50', close),
-                'bb_upper': latest.get('BBU_20_2.0_2.0', close * 1.02),
-                'bb_middle': latest.get('BBM_20_2.0_2.0', close),
-                'bb_lower': latest.get('BBL_20_2.0_2.0', close * 0.98)
+                'bb_upper': latest.get('BBU_20_2.0', close * 1.02),
+                'bb_middle': latest.get('BBM_20_2.0', close),
+                'bb_lower': latest.get('BBL_20_2.0', close * 0.98)
             }
         
         except Exception as e:
