@@ -14,6 +14,7 @@ from src.strategies.hybrid_strategy_engine import HybridStrategyEngine
 from src.indicators.indicator_engine import IndicatorEngine
 from src.indicators.technical import add_all_indicators
 from src.utils.logger import TradingLogger
+from src.utils.order_logger import OrderLogger
 
 
 class HybridBacktester:
@@ -34,6 +35,7 @@ class HybridBacktester:
         
         # Initialize logger
         self.logger = TradingLogger.get_logger('HybridBacktest')
+        self.order_logger = OrderLogger(output_dir='./data/outputs')
         
         # Initialize engines
         self.indicator_engine = IndicatorEngine(symbol)
@@ -152,7 +154,27 @@ class HybridBacktester:
                 'timestamp': bar['timestamp']
             }
             self.pending_orders.append(pending_order)
-    
+            
+            # Log order
+            order_type = 'BUY' if order['side'] == 'BUY' else 'SELL'
+            action = 'OPEN' if order['side'] == 'BUY' else 'CLOSE'
+            self.order_logger.log_order(
+                symbol=self.symbol,
+                order_type=order_type,
+                side='LONG',
+                action=action,
+                price=order['price'],
+                quantity=0.0,  # Will be calculated on fill
+                status='NEW',
+                strategy='HybridStrategy',
+                tag=order.get('tag', ''),
+                reason=f"Plan: {order.get('tag', '')}",
+                mode='backtest'
+            )
+            
+            self.logger.info(
+                f"📝 Order placed: {order_type} @ ${order['price']:.2f} [{order.get('tag', '')}]"
+            )    
     def _check_fills(self, bar: dict):
         """Check if pending orders are filled"""
         filled_orders = []
@@ -203,11 +225,26 @@ class HybridBacktester:
             
             self.cash -= order_value
             
+            # Log fill
+            self.order_logger.log_fill(
+                symbol=self.symbol,
+                order_id=f"ORD_{timestamp}",
+                fill_type='BUY',
+                side='LONG',
+                action='OPEN',
+                price=fill_price,
+                quantity=qty,
+                strategy='HybridStrategy',
+                tag=order['tag']
+            )
+            
             # Notify DCA fill
             if 'dca' in order['tag']:
                 self.strategy_engine.notify_dca_fill(fill_price)
             
-            self.logger.debug(f"BUY filled: {qty:.4f} @ ${fill_price:.2f} [{order['tag']}]")
+            self.logger.info(
+                f"✅ BUY filled: {qty:.4f} @ ${fill_price:.2f}, Value=${order_value:.2f} [{order['tag']}]"
+            )
         
         else:  # SELL
             # Close or reduce position
@@ -232,9 +269,26 @@ class HybridBacktester:
                     
                     del self.positions[self.symbol]
                     
-                    self.logger.debug(
-                        f"SELL filled (close): {pos['qty']:.4f} @ ${fill_price:.2f}, "
-                        f"PnL=${pnl:.2f} [{order['tag']}]"
+                    # Log fill
+                    pnl_pct = (pnl / (pos['qty'] * pos['entry_price'])) * 100
+                    self.order_logger.log_fill(
+                        symbol=self.symbol,
+                        order_id=f"ORD_{timestamp}",
+                        fill_type='SELL',
+                        side='LONG',
+                        action='CLOSE',
+                        price=fill_price,
+                        quantity=pos['qty'],
+                        pnl=pnl,
+                        pnl_pct=pnl_pct,
+                        strategy='HybridStrategy',
+                        tag=order['tag']
+                    )
+                    
+                    emoji = "🟢" if pnl > 0 else "🔴"
+                    self.logger.info(
+                        f"{emoji} SELL filled (close): {pos['qty']:.4f} @ ${fill_price:.2f}, "
+                        f"PnL=${pnl:.2f} ({pnl_pct:+.2f}%) [{order['tag']}]"
                     )
                 else:
                     # Partial close
@@ -356,6 +410,9 @@ class HybridBacktester:
                 print(f"  {state}: {count} bars ({pct:.1f}%)")
         
         print("\n" + "="*70)
+        
+        # Print order summary
+        self.order_logger.print_summary()
         
         # Save results
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
