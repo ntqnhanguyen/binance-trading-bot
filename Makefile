@@ -1,76 +1,52 @@
-.PHONY: help install run backtest download-data docker-build docker-run docker-stop clean test-api setup-env
+.PHONY: help install test clean run backtest download-data setup-env test-api docker-build docker-run
 
-help:
-	@echo "Binance Trading Bot - Available Commands"
-	@echo "========================================"
-	@echo "setup-env        - Create .env file from template"
-	@echo "test-api         - Test Binance API connection"
-	@echo "install          - Install dependencies"
-	@echo "run              - Run the trading bot"
-	@echo "backtest         - Run backtest"
-	@echo "download-data    - Download historical data"
-	@echo "docker-build     - Build Docker image"
-	@echo "docker-run       - Run with Docker Compose"
-	@echo "docker-stop      - Stop Docker containers"
-	@echo "docker-logs      - View Docker logs"
-	@echo "clean            - Clean logs and cache files"
+help:  ## Show this help message
+@echo "Available commands:"
+@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-setup-env:
-	@cp .env.example .env
-	@echo "✓ Created .env file"
-	@echo "Please edit .env and add your API keys"
+install:  ## Install dependencies
+pip3 install -r requirements.txt
 
-test-api:
-	python test_api.py
+setup-env:  ## Setup environment file
+@if [ ! -f .env ]; then \
+cp .env.example .env; \
+echo "✓ .env file created. Please edit it with your API keys."; \
+else \
+echo "✓ .env file already exists"; \
+fi
 
-install:
-	pip install -r requirements.txt
+test-api:  ## Test API connection
+python test_api.py
 
-run:
-	python main.py
+download-data:  ## Download historical data
+python download_data.py --symbol BTCUSDT --interval 1m --start 2024-01-01
 
-backtest:
-	python run_backtest.py
+backtest:  ## Run backtest
+python run_backtest.py --symbol BTCUSDT --capital 10000 --data ./data/BTCUSDT_1m.csv
 
-download-data:
-	python download_data.py --symbols BTCUSDT ETHUSDT BNBUSDT
+run:  ## Run live trading bot
+python main.py
 
-docker-build:
-	docker-compose build
+paper:  ## Run paper trading
+TRADING_MODE=paper python main.py
 
-docker-run:
-	docker-compose up -d
+docker-build:  ## Build Docker image
+docker build -t binance-trading-bot .
 
-docker-stop:
-	docker-compose down
+docker-run:  ## Run with Docker
+docker-compose up -d
 
-docker-logs:
-	docker-compose logs -f trading-bot
+docker-stop:  ## Stop Docker containers
+docker-compose down
 
-clean:
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete
-	find . -type f -name "*.pyo" -delete
-	rm -rf logs/*.log
-	rm -rf .pytest_cache
-	rm -rf htmlcov
-	rm -rf .coverage
+docker-logs:  ## View Docker logs
+docker-compose logs -f
 
+clean:  ## Clean up cache and temp files
+find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+find . -type f -name "*.pyc" -delete
+find . -type f -name "*.pyo" -delete
+find . -type f -name ".DS_Store" -delete
 
-# Hybrid Strategy Commands
-.PHONY: hybrid-backtest hybrid-run hybrid-paper
-
-hybrid-backtest:  ## Run hybrid strategy backtest
-@echo "Running hybrid strategy backtest..."
-python run_hybrid_backtest.py --symbol BTCUSDT --capital 10000 --data ./data/BTCUSDT_1m.csv
-
-hybrid-paper:  ## Run hybrid strategy in paper trading mode
-@echo "Starting hybrid strategy paper trading..."
-@cp .env.hybrid.example .env 2>/dev/null || true
-TRADING_MODE=paper python main_hybrid.py
-
-hybrid-run:  ## Run hybrid strategy live (REAL MONEY!)
-@echo "⚠️  WARNING: Running with REAL MONEY!"
-@read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1
-TRADING_MODE=mainnet python main_hybrid.py
-
+test:  ## Run tests
+python test_hybrid_strategy.py

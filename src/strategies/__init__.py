@@ -1,18 +1,10 @@
 """
-Trading strategies module
-"""
-from .base_strategy import BaseStrategy, Signal
-from .dca_strategy import DCAStrategy
-from .trend_following import TrendFollowingStrategy
-from .mean_reversion import MeanReversionStrategy
-from .grid_strategy import GridStrategy
+Trading strategies package
 
-__all__ = [
-    'BaseStrategy',
-    'Signal',
-    'DCAStrategy',
-    'TrendFollowingStrategy',
-    'MeanReversionStrategy',
-    'GridStrategy'
-]
+Only Hybrid Strategy Engine is maintained.
+Old strategies (DCA, Grid, Trend, Mean Reversion) have been removed.
+"""
+from .hybrid_strategy_engine import HybridStrategyEngine
+
+__all__ = ['HybridStrategyEngine']
 

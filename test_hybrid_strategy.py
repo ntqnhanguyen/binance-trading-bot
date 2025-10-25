@@ -13,7 +13,7 @@ from src.indicators.technical import add_all_indicators
 
 def load_config():
     """Load hybrid strategy configuration"""
-    with open('config/hybrid_strategy.yaml', 'r') as f:
+    with open('config/config.yaml', 'r') as f:
         config = yaml.safe_load(f)
     return config
 
