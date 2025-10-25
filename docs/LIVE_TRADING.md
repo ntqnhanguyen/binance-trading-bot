@@ -189,31 +189,74 @@ INITIAL_CAPITAL=1000 \
 - Monitor daily
 - Scale up gradually
 
-## Monitoring
+## Monitoring (v2.5.0+)
 
-### Console Output
+Version 2.5.0 introduces a completely redesigned monitoring experience with enhanced logging, colored console output, and detailed CSV reports for comprehensive real-time visibility.
+
+### Key Features
+
+- **Colored Console Output**: Uses colors to distinguish between different actions (buys, sells, alerts) and states (RUN, DEGRADED, PAUSED) for at-a-glance understanding.
+- **Detailed Order Logging**: Every order placed, filled, or rejected is logged with rich details to both the console and a dedicated CSV file.
+- **Real-time Position & Equity**: The bot now displays your portfolio equity, cash, position value, and unrealized PnL in every trading loop.
+- **Structured CSV Reports**: All orders, fills, and a session summary are saved to `data/outputs/` for easy analysis and record-keeping.
+
+### Enabling/Disabling Colors
+
+Colored output is enabled by default. To disable it (e.g., for environments that don't support ANSI colors), set the following environment variable:
+
+```bash
+export ENABLE_COLORS=false
+```
+
+
+
+### Enhanced Console Output
+
+The new console output provides a clear, color-coded overview of the bot's activity. Here is an example of what you'll see in each trading loop:
 
 ```
-╔════════════════════════════════════════════════════════════╗
-║          Binance Trading Bot - Live Trading               ║
-╚════════════════════════════════════════════════════════════╝
 
-Configuration:
-  Mode:           testnet
-  Symbol:         BTCUSDT
-  Capital:        $1000
-  Config:         config/config.yaml
+================================================================================
+  Trading Loop - 2025-10-25 14:30:00
+================================================================================
 
-Starting bot...
-Log file: logs/trading_testnet_20251025_143015.log
+💰 EQUITY: $10,500.50  |  Cash: $8,500.00  |  Position: $2,000.50
 
-Bot is running. Press Ctrl+C to stop.
+--------------------------------------------------------------------------------
+  BTCUSDT @ $67,850.00
+--------------------------------------------------------------------------------
 
-2025-10-25 14:30:15 - INFO - Bot started in testnet mode
-2025-10-25 14:30:15 - INFO - Symbol: BTCUSDT, Capital: $1000.00
-2025-10-25 14:30:20 - INFO - ✅ BUY filled: 0.0010 @ $50,000.00, Fee=$0.05
-2025-10-25 14:35:15 - INFO - 🟢 SELL filled: 0.0010 @ $51,000.00, PnL=$0.95
+✓ PnL State: RUN  |  Daily PnL: +2.50%  |  Gap PnL: +1.20%
+
+📊 BTCUSDT Plan: Band=MID  Spread=0.500%  |  Grid=6  DCA=2  TP=1
+
+📈 ORDER PLACED: GRID | BUY 0.014700 BTCUSDT @ $67500.00  [grid_buy_1]  (ID: 12345678)
+📉 ORDER PLACED: GRID | SELL 0.014700 BTCUSDT @ $68200.00  [grid_sell_1]  (ID: 12345679)
+📈 ORDER PLACED: DCA | BUY 0.029400 BTCUSDT @ $66800.00  [dca_oversold]  (ID: 12345680)
+
+✅ ORDER FILLED: GRID | BUY 0.014700 BTCUSDT @ $67500.00  [grid_buy_1]
+✅ ORDER FILLED: GRID | SELL 0.014700 BTCUSDT @ $68200.00  PnL: +10.29  [grid_sell_1]
+
+📍 POSITION: BTCUSDT  |  Qty: 0.029400  |  Avg: $67200.00  |  Current: $67850.00  |  Unrealized PnL: +19.11 (+0.97%)
+
+🛑 HARD STOP TRIGGERED: BTCUSDT  |  Reason: Daily PnL <= -5.0%
+
 ```
+
+**Output Breakdown:**
+
+| Icon | Color          | Section                | Description                                                                 |
+| :--- | :------------- | :--------------------- | :-------------------------------------------------------------------------- |
+| 💰    | Cyan           | **Equity**             | Displays current portfolio equity, cash, and total value of open positions. |
+| ✓/⚠/⏸ | Green/Yellow/Red | **PnL State**          | Shows the current PnL Gate state: `RUN`, `DEGRADED`, or `PAUSED`.             |
+| 📊    | White          | **Order Plan**         | Summarizes the strategy plan for the current bar, including order counts.   |
+| 📈/📉 | Green/Red      | **Order Placed**       | Indicates a new order has been sent to the exchange.                        |
+| ✅    | Green/Red      | **Order Filled**       | Confirms that an order has been successfully filled.                        |
+| ❌    | Red            | **Order Rejected**     | Appears if an order fails to be placed, with a reason for the rejection.    |
+| 📍    | White          | **Position**           | Shows the status of your current open position for a symbol.                |
+| 🛑    | Red Background | **Hard Stop**          | A critical alert that appears when a hard stop has been triggered.          |
+| 🔄    | Green          | **Auto-Resume**        | Notification that the bot has automatically resumed trading after a stop.   |
+
 
 ### Log Files
 
@@ -233,14 +276,17 @@ grep ERROR logs/trading_testnet_*.log
 grep "filled" logs/trading_testnet_*.log
 ```
 
-### Output Files
+### CSV Output Files
+
+The bot automatically logs all trading activity to CSV files in the `data/outputs/` directory. A new set of files is created for each trading session, identified by a unique `session_id`.
 
 **Location:** `data/outputs/`
 
 **Files:**
-- `orders_{session_id}.csv` - All orders
-- `fills_{session_id}.csv` - All fills
-- `summary_{session_id}.csv` - Summary stats
+
+- **`orders_{session_id}.csv`**: A detailed log of every order placed by the bot, including its type, side, price, quantity, status, and associated strategy tag.
+- **`fills_{session_id}.csv`**: A record of every filled order, including the fill price, quantity, fees, and the realized Profit and Loss (PnL) for closing trades.
+- **`summary_{session_id}.csv`**: A high-level summary of the entire trading session, including total volume, fees, net PnL, and win rate.
 
 **Monitor:**
 ```bash

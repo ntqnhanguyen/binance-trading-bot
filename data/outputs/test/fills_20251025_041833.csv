@@ -1,0 +1,1 @@
+timestamp,session_id,symbol,order_id,fill_id,type,side,action,price,quantity,value,fee,fee_asset,pnl,pnl_pct,strategy,tag

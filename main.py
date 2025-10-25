@@ -3,6 +3,8 @@ Live Trading Bot with Hybrid Strategy Engine
 
 Runs live trading using Grid + DCA hybrid strategy with dynamic spread,
 PnL Gate, and Stop-Loss management.
+
+Version: 2.5.0 - Enhanced logging with colored console output
 """
 import os
 import time
@@ -13,6 +15,8 @@ from typing import Dict, List
 
 from src.utils.logger import TradingLogger
 from src.utils.config import config
+from src.utils.console_logger import ConsoleLogger
+from src.utils.order_logger import OrderLogger
 from src.core.exchange import BinanceExchange
 from src.core.portfolio import Portfolio
 from src.strategies.hybrid_strategy_engine import HybridStrategyEngine
@@ -22,7 +26,7 @@ from src.indicators.technical import add_all_indicators
 
 class HybridTradingBot:
     """
-    Live trading bot using Hybrid Strategy Engine
+    Live trading bot using Hybrid Strategy Engine with enhanced logging
     """
     
     def __init__(self, symbols: List[str], config_path_path: str):
@@ -38,6 +42,14 @@ class HybridTradingBot:
         
         # Initialize logger
         self.logger = TradingLogger.get_logger('HybridBot')
+        
+        # Initialize console logger (colored output)
+        enable_colors = os.getenv('ENABLE_COLORS', 'true').lower() == 'true'
+        self.console = ConsoleLogger(self.logger, enable_colors=enable_colors)
+        
+        # Initialize order logger
+        output_dir = os.getenv('OUTPUT_DIR', './data/outputs')
+        self.order_logger = OrderLogger(output_dir=output_dir)
         
         # Load hybrid strategy config
         with open(config_path_path, 'r') as f:
@@ -72,7 +84,12 @@ class HybridTradingBot:
         # Interval
         self.interval = int(os.getenv('TRADING_INTERVAL', '60'))  # seconds
         
-        self.logger.info(f"HybridTradingBot initialized: {symbols}")
+        # Trading mode
+        self.trading_mode = trading_mode
+        
+        self.console.print_success(f"HybridTradingBot initialized: {symbols}")
+        self.console.print_info(f"Trading Mode: {trading_mode.upper()}")
+        self.console.print_info(f"Initial Capital: ${initial_capital:,.2f}")
     
     def _get_policy_config(self, symbol: str) -> dict:
         """Get policy config for symbol"""
@@ -92,7 +109,7 @@ class HybridTradingBot:
     def run(self):
         """Run the trading bot"""
         self.running = True
-        self.logger.info("Hybrid Trading Bot started")
+        self.console.print_header("HYBRID TRADING BOT STARTED")
         
         try:
             while self.running:
@@ -100,8 +117,9 @@ class HybridTradingBot:
                 time.sleep(self.interval)
         
         except KeyboardInterrupt:
-            self.logger.info("Received shutdown signal")
+            self.console.print_warning("Received shutdown signal")
         except Exception as e:
+            self.console.print_error(f"Unexpected error: {e}")
             self.logger.error(f"Unexpected error: {e}", exc_info=True)
         finally:
             self.stop()
@@ -109,8 +127,7 @@ class HybridTradingBot:
     def _trading_loop(self):
         """Main trading loop iteration"""
         try:
-            self.logger.info("=" * 60)
-            self.logger.info(f"Trading loop at {datetime.now()}")
+            self.console.print_header(f"Trading Loop - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             
             # Calculate current equity
             current_prices = {}
@@ -119,24 +136,39 @@ class HybridTradingBot:
                     ticker = self.exchange.get_ticker(symbol)
                     current_prices[symbol] = float(ticker['lastPrice'])
                 except Exception as e:
-                    self.logger.error(f"Error getting ticker for {symbol}: {e}")
+                    self.console.print_error(f"Error getting ticker for {symbol}: {e}")
                     continue
             
+            # Get portfolio metrics
             equity = self.portfolio.get_equity(current_prices)
+            cash = self.portfolio.cash
             
-            self.logger.info(f"Portfolio Equity: ${equity:,.2f}")
+            # Calculate position value
+            position_value = 0.0
+            for symbol in self.symbols:
+                position = self.portfolio.get_position(symbol, 'Hybrid')
+                if position and symbol in current_prices:
+                    position_value += position['quantity'] * current_prices[symbol]
+            
+            # Display equity
+            self.console.print_equity(equity, cash, position_value)
             
             # Process each symbol
             for symbol in self.symbols:
                 try:
                     self._process_symbol(symbol, current_prices.get(symbol), equity)
                 except Exception as e:
+                    self.console.print_error(f"Error processing {symbol}: {e}")
                     self.logger.error(f"Error processing {symbol}: {e}", exc_info=True)
             
             # Check fills
             self._check_fills()
             
+            # Display positions
+            self._display_positions(current_prices)
+            
         except Exception as e:
+            self.console.print_error(f"Error in trading loop: {e}")
             self.logger.error(f"Error in trading loop: {e}", exc_info=True)
     
     def _process_symbol(self, symbol: str, current_price: float, equity: float):
@@ -144,7 +176,7 @@ class HybridTradingBot:
         if current_price is None:
             return
         
-        self.logger.info(f"Processing {symbol} @ ${current_price:.2f}")
+        self.console.print_section(f"{symbol} @ ${current_price:.2f}")
         
         # Get market data
         df = self.exchange.get_klines(
@@ -154,7 +186,7 @@ class HybridTradingBot:
         )
         
         if df.empty:
-            self.logger.warning(f"No data for {symbol}")
+            self.console.print_warning(f"No data for {symbol}")
             return
         
         # Add indicators
@@ -178,18 +210,22 @@ class HybridTradingBot:
         strategy_engine = self.strategy_engines[symbol]
         plan = strategy_engine.on_bar(bar, equity)
         
-        self.logger.info(
-            f"{symbol} Plan: State={plan['pnl_gate_state']}, "
-            f"Band={plan['band']}, Spread={plan['spread_pct']:.3f}%, "
-            f"Grid={len(plan['grid_orders'])}, DCA={len(plan['dca_orders'])}, "
-            f"TP={len(plan['tp_orders'])}"
+        # Display plan summary
+        self.console.print_order_plan(
+            symbol=symbol,
+            band=plan['band'],
+            spread_pct=plan['spread_pct'],
+            grid_count=len(plan['grid_orders']),
+            dca_count=len(plan['dca_orders']),
+            tp_count=len(plan['tp_orders'])
         )
+        
+        # Display PnL state
+        self.console.print_pnl_state(plan['pnl_gate_state'])
         
         # Check hard stop
         if plan['sl_action']['stop']:
-            self.logger.critical(
-                f"Hard stop triggered for {symbol}: {plan['sl_action']['reason']}"
-            )
+            self.console.print_hard_stop(symbol, plan['sl_action']['reason'])
             self._close_all_positions(symbol, current_price)
             return
         
@@ -199,21 +235,33 @@ class HybridTradingBot:
             if plan['kill_replace']:
                 self._cancel_grid_orders(symbol)
             
-            self._place_orders(symbol, plan['grid_orders'], current_price)
-            self._place_orders(symbol, plan['dca_orders'], current_price)
-            self._place_orders(symbol, plan['tp_orders'], current_price)
+            self._place_orders(symbol, plan['grid_orders'], current_price, 'GRID')
+            self._place_orders(symbol, plan['dca_orders'], current_price, 'DCA')
+            self._place_orders(symbol, plan['tp_orders'], current_price, 'TP')
         
         elif plan['pnl_gate_state'] == 'DEGRADED':
             # Reduced operation
-            self._place_orders(symbol, plan['dca_orders'], current_price)
-            self._place_orders(symbol, plan['tp_orders'], current_price)
+            self.console.print_warning(f"{symbol} in DEGRADED mode - Grid orders disabled")
+            self._place_orders(symbol, plan['dca_orders'], current_price, 'DCA')
+            self._place_orders(symbol, plan['tp_orders'], current_price, 'TP')
         
         # PAUSED: no new orders
         elif plan['pnl_gate_state'] == 'PAUSED':
-            self.logger.warning(f"{symbol} in PAUSED state - no new orders")
+            self.console.print_warning(f"{symbol} in PAUSED state - No new orders")
     
-    def _place_orders(self, symbol: str, orders: List[dict], current_price: float):
-        """Place orders"""
+    def _place_orders(self, symbol: str, orders: List[dict], current_price: float, order_type: str):
+        """
+        Place orders with enhanced logging
+        
+        Args:
+            symbol: Trading pair
+            orders: List of order dicts
+            current_price: Current market price
+            order_type: Type of orders (GRID, DCA, TP)
+        """
+        if not orders:
+            return
+        
         for order in orders:
             try:
                 # Calculate quantity (1% of equity per order)
@@ -238,9 +286,7 @@ class HybridTradingBot:
                 tag = order.get('tag', '')
                 
                 # In paper/testnet mode, just track orders
-                trading_mode = os.getenv('TRADING_MODE', 'paper')
-                
-                if trading_mode == 'paper':
+                if self.trading_mode == 'paper':
                     # Paper trading - just track
                     pending_order = {
                         'symbol': symbol,
@@ -248,35 +294,106 @@ class HybridTradingBot:
                         'price': price,
                         'qty': qty,
                         'tag': tag,
+                        'order_type': order_type,
                         'timestamp': datetime.now()
                     }
                     self.pending_orders[symbol].append(pending_order)
                     
-                    self.logger.info(
-                        f"Paper order: {side} {qty:.4f} {symbol} @ ${price:.2f} [{tag}]"
-                    )
-                else:
-                    # Real trading
-                    order_result = self.exchange.place_limit_order(
-                        symbol=symbol,
+                    # Enhanced console logging
+                    self.console.print_order_placed(
+                        order_type=order_type,
                         side=side,
-                        quantity=qty,
-                        price=price
+                        symbol=symbol,
+                        qty=qty,
+                        price=price,
+                        tag=tag
                     )
                     
-                    self.logger.info(
-                        f"Order placed: {side} {qty:.4f} {symbol} @ ${price:.2f} "
-                        f"[{tag}] OrderID={order_result.get('orderId')}"
+                    # Log to CSV
+                    self.order_logger.log_order(
+                        symbol=symbol,
+                        order_type=side,
+                        side='LONG' if side == 'BUY' else 'SHORT',
+                        action='OPEN' if side == 'BUY' else 'CLOSE',
+                        price=price,
+                        quantity=qty,
+                        status='NEW',
+                        strategy='Hybrid',
+                        tag=tag,
+                        reason=order_type,
+                        mode=self.trading_mode
                     )
+                else:
+                    # Real trading (testnet or mainnet)
+                    try:
+                        order_result = self.exchange.place_limit_order(
+                            symbol=symbol,
+                            side=side,
+                            quantity=qty,
+                            price=price
+                        )
+                        
+                        order_id = order_result.get('orderId', 'N/A')
+                        
+                        # Enhanced console logging
+                        self.console.print_order_placed(
+                            order_type=order_type,
+                            side=side,
+                            symbol=symbol,
+                            qty=qty,
+                            price=price,
+                            tag=tag,
+                            order_id=str(order_id)
+                        )
+                        
+                        # Log to CSV
+                        self.order_logger.log_order(
+                            symbol=symbol,
+                            order_type=side,
+                            side='LONG' if side == 'BUY' else 'SHORT',
+                            action='OPEN' if side == 'BUY' else 'CLOSE',
+                            price=price,
+                            quantity=qty,
+                            status='NEW',
+                            strategy='Hybrid',
+                            tag=tag,
+                            reason=order_type,
+                            mode=self.trading_mode,
+                            order_id=str(order_id)
+                        )
+                    
+                    except Exception as e:
+                        # Order rejected
+                        self.console.print_order_rejected(
+                            order_type=order_type,
+                            side=side,
+                            symbol=symbol,
+                            price=price,
+                            reason=str(e)
+                        )
+                        
+                        # Log rejection
+                        self.order_logger.log_order(
+                            symbol=symbol,
+                            order_type=side,
+                            side='LONG' if side == 'BUY' else 'SHORT',
+                            action='OPEN' if side == 'BUY' else 'CLOSE',
+                            price=price,
+                            quantity=qty,
+                            status='REJECTED',
+                            strategy='Hybrid',
+                            tag=tag,
+                            reason=f"{order_type} - {str(e)}",
+                            mode=self.trading_mode
+                        )
+                        raise
             
             except Exception as e:
-                self.logger.error(f"Error placing order: {e}")
+                self.console.print_error(f"Error placing {order_type} order: {e}")
     
     def _check_fills(self):
         """Check for filled orders"""
-        trading_mode = os.getenv('TRADING_MODE', 'paper')
-        
-        if trading_mode == 'paper':
+        if self.trading_mode == 'paper':
             # Paper trading - simulate fills
             for symbol in self.symbols:
                 try:
@@ -297,18 +414,21 @@ class HybridTradingBot:
                         self.pending_orders[symbol].remove(order)
                 
                 except Exception as e:
-                    self.logger.error(f"Error checking fills for {symbol}: {e}")
+                    self.console.print_error(f"Error checking fills for {symbol}: {e}")
         else:
             # Real trading - check with exchange
             # TODO: Implement real order tracking
             pass
     
     def _fill_order(self, order: dict, fill_price: float):
-        """Process filled order"""
+        """Process filled order with enhanced logging"""
         symbol = order['symbol']
         side = order['side']
         qty = order['qty']
         tag = order['tag']
+        order_type = order.get('order_type', 'UNKNOWN')
+        
+        pnl = None
         
         if side == 'BUY':
             # Open position
@@ -321,43 +441,142 @@ class HybridTradingBot:
             )
             
             # Notify DCA fill
-            if 'dca' in tag:
+            if 'dca' in tag.lower():
                 self.strategy_engines[symbol].notify_dca_fill(fill_price)
             
-            self.logger.info(
-                f"BUY filled: {qty:.4f} {symbol} @ ${fill_price:.2f} [{tag}]"
+            # Enhanced console logging
+            self.console.print_order_filled(
+                order_type=order_type,
+                side=side,
+                symbol=symbol,
+                qty=qty,
+                price=fill_price,
+                tag=tag
+            )
+            
+            # Log fill to CSV
+            self.order_logger.log_fill(
+                symbol=symbol,
+                order_id=f"ORD_{symbol}_{int(datetime.now().timestamp())}",
+                fill_type=side,
+                side='LONG',
+                action='OPEN',
+                price=fill_price,
+                quantity=qty,
+                fee=fill_price * qty * 0.001,  # 0.1% fee
+                fee_asset='USDT',
+                pnl=0.0,
+                pnl_pct=0.0,
+                strategy='Hybrid',
+                tag=tag
             )
         else:
             # Close position
-            self.portfolio.close_position(
-                symbol=symbol,
-                strategy='Hybrid',
-                exit_price=fill_price
-            )
+            position = self.portfolio.get_position(symbol, 'Hybrid')
             
-            self.logger.info(
-                f"SELL filled: {qty:.4f} {symbol} @ ${fill_price:.2f} [{tag}]"
-            )
+            if position:
+                # Calculate PnL
+                entry_price = position['entry_price']
+                pnl = (fill_price - entry_price) * qty
+                pnl_pct = ((fill_price - entry_price) / entry_price) * 100
+                
+                self.portfolio.close_position(
+                    symbol=symbol,
+                    strategy='Hybrid',
+                    exit_price=fill_price
+                )
+                
+                # Enhanced console logging
+                self.console.print_order_filled(
+                    order_type=order_type,
+                    side=side,
+                    symbol=symbol,
+                    qty=qty,
+                    price=fill_price,
+                    pnl=pnl,
+                    tag=tag
+                )
+                
+                # Log fill to CSV
+                self.order_logger.log_fill(
+                    symbol=symbol,
+                    order_id=f"ORD_{symbol}_{int(datetime.now().timestamp())}",
+                    fill_type=side,
+                    side='LONG',
+                    action='CLOSE',
+                    price=fill_price,
+                    quantity=qty,
+                    fee=fill_price * qty * 0.001,  # 0.1% fee
+                    fee_asset='USDT',
+                    pnl=pnl,
+                    pnl_pct=pnl_pct,
+                    strategy='Hybrid',
+                    tag=tag
+                )
+    
+    def _display_positions(self, current_prices: Dict[str, float]):
+        """Display current positions"""
+        for symbol in self.symbols:
+            position = self.portfolio.get_position(symbol, 'Hybrid')
+            
+            if position and symbol in current_prices:
+                qty = position['quantity']
+                avg_price = position['entry_price']
+                current_price = current_prices[symbol]
+                
+                unrealized_pnl = (current_price - avg_price) * qty
+                unrealized_pnl_pct = ((current_price - avg_price) / avg_price) * 100
+                
+                self.console.print_position(
+                    symbol=symbol,
+                    qty=qty,
+                    avg_price=avg_price,
+                    current_price=current_price,
+                    unrealized_pnl=unrealized_pnl,
+                    unrealized_pnl_pct=unrealized_pnl_pct
+                )
     
     def _cancel_grid_orders(self, symbol: str):
         """Cancel grid orders for symbol"""
-        self.pending_orders[symbol] = [
-            order for order in self.pending_orders[symbol]
-            if 'grid' not in order['tag']
-        ]
-        self.logger.info(f"Grid orders cancelled for {symbol}")
+        cancelled_count = 0
+        
+        # Filter out grid orders
+        new_pending = []
+        for order in self.pending_orders[symbol]:
+            if 'grid' in order['tag'].lower():
+                cancelled_count += 1
+            else:
+                new_pending.append(order)
+        
+        self.pending_orders[symbol] = new_pending
+        
+        if cancelled_count > 0:
+            self.console.print_info(f"Cancelled {cancelled_count} grid orders for {symbol}")
     
     def _close_all_positions(self, symbol: str, price: float):
         """Close all positions for symbol"""
         position = self.portfolio.get_position(symbol, 'Hybrid')
         
         if position:
+            qty = position['quantity']
+            entry_price = position['entry_price']
+            pnl = (price - entry_price) * qty
+            
             self.portfolio.close_position(
                 symbol=symbol,
                 strategy='Hybrid',
                 exit_price=price
             )
-            self.logger.info(f"Position closed: {symbol} @ ${price:.2f}")
+            
+            self.console.print_order_filled(
+                order_type='HARD_STOP',
+                side='SELL',
+                symbol=symbol,
+                qty=qty,
+                price=price,
+                pnl=pnl,
+                tag='hard_stop'
+            )
     
     def _round_quantity(self, symbol: str, qty: float) -> float:
         """Round quantity to exchange precision"""
@@ -369,17 +588,19 @@ class HybridTradingBot:
         """Stop the trading bot"""
         self.running = False
         
+        self.console.print_header("SHUTTING DOWN")
+        
         # Print final statistics
         stats = self.portfolio.get_statistics()
         
-        self.logger.info("=" * 60)
-        self.logger.info("FINAL STATISTICS")
-        self.logger.info("=" * 60)
+        self.console.print_section("FINAL STATISTICS")
         self.logger.info(f"Total Trades: {stats['total_trades']}")
         self.logger.info(f"Win Rate: {stats['win_rate']:.2f}%")
         self.logger.info(f"Total PnL: ${stats['total_pnl']:.2f}")
         self.logger.info(f"Open Positions: {stats['open_positions']}")
-        self.logger.info("=" * 60)
+        
+        # Print order summary
+        self.order_logger.print_summary()
         
         # Export trades
         if self.portfolio.trade_history:
@@ -387,7 +608,9 @@ class HybridTradingBot:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             report_prefix = f"./data/hybrid_live_trades_{timestamp}"
             TradeExporter.export_detailed_report(self.portfolio.trade_history, report_prefix)
-            self.logger.info(f"Trade report exported: {report_prefix}")
+            self.console.print_success(f"Trade report exported: {report_prefix}")
+        
+        self.console.print_success("Bot stopped successfully")
 
 
 def main():
@@ -401,15 +624,17 @@ def main():
     symbols = [s.strip() for s in symbols_str.split(',')]
     
     # Get config path
-    config_path = os.getenv('CONFIG_PATH', 'config/config.yaml')
+    config_path = os.getenv('CONFIG_PATH', 'config/hybrid_strategy.yaml')
     
-    print("\n" + "="*60)
-    print("HYBRID STRATEGY LIVE TRADING BOT")
-    print("="*60)
+    print("\n" + "="*80)
+    print("HYBRID STRATEGY LIVE TRADING BOT v2.5.0")
+    print("Enhanced Logging Edition")
+    print("="*80)
     print(f"Symbols: {', '.join(symbols)}")
     print(f"Config: {config_path}")
-    print(f"Mode: {os.getenv('TRADING_MODE', 'paper')}")
-    print("="*60 + "\n")
+    print(f"Mode: {os.getenv('TRADING_MODE', 'paper').upper()}")
+    print(f"Interval: {os.getenv('TRADING_INTERVAL', '60')}s")
+    print("="*80 + "\n")
     
     # Create bot
     bot = HybridTradingBot(symbols, config_path)

@@ -13,9 +13,142 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Trade visualization charts
 - Performance attribution by strategy
 - Database integration
-- Real-time dashboard
-- Orchestrator integration for Hybrid Strategy
-- Live trading with Hybrid Strategy
+- Real-time web dashboard
+- Telegram notifications
+- Email reports
+
+## [2.5.0] - 2025-10-25
+
+### Added - Enhanced Logging System
+
+**Comprehensive logging enhancement with colored console output and detailed CSV reports for improved monitoring and analysis.**
+
+#### New Components
+
+**1. ConsoleLogger** (`src/utils/console_logger.py`)
+- Color-coded console output using ANSI color codes
+- Specialized methods for different event types
+- Visual distinction between orders, fills, alerts, and states
+- Icons and emojis for at-a-glance understanding
+- Configurable color support (can be disabled)
+
+**2. Enhanced OrderLogger Integration**
+- Integrated OrderLogger into main trading loop
+- Dual-channel logging (console + CSV)
+- Comprehensive order tracking with status updates
+- Detailed fill logging with PnL calculation
+- Session summary generation
+
+**3. Updated Main Trading Bot** (`main.py`)
+- Enhanced order placement logging
+- Real-time equity and position display
+- PnL Gate state visualization
+- Order plan summary before execution
+- Critical alerts for hard stops and auto-resume
+
+#### Features
+
+**Color-Coded Console Output**
+- Green: Buy orders, positive PnL, RUN state, success messages
+- Red: Sell orders, negative PnL, PAUSED state, errors, hard stops
+- Yellow: Warnings, DEGRADED state, DCA orders
+- Cyan: Headers, equity information, grid orders
+- Magenta: Take-profit orders
+- Blue: Section dividers, informational messages
+
+**Enhanced Order Visibility**
+- Order placement: Type, side, symbol, quantity, price, tag, order ID
+- Order fills: All placement details plus realized PnL
+- Order rejections: Details plus rejection reason
+- Real-time status updates
+
+**Real-time Portfolio Monitoring**
+- Equity breakdown (total, cash, position value)
+- Position status (quantity, average price, current price, unrealized PnL)
+- Updated every trading loop
+
+**PnL Gate State Display**
+- Clear visual indicators for RUN/DEGRADED/PAUSED states
+- Daily PnL and Gap PnL percentages
+- Color-coded based on state severity
+
+**Order Plan Summary**
+- Volatility band (near/mid/far)
+- Dynamic spread percentage
+- Count of grid, DCA, and TP orders planned
+
+**Critical Alerts**
+- Hard stop triggers with prominent red background
+- Auto-resume notifications
+- Warning and error messages with appropriate colors
+
+**Structured CSV Logging**
+- `orders_{session_id}.csv`: Complete order log with 16 fields
+- `fills_{session_id}.csv`: Fill log with PnL and fees (17 fields)
+- `summary_{session_id}.csv`: Session summary with performance metrics
+- Unique session ID for easy tracking
+- Compatible with Excel, Python, R for analysis
+
+#### Configuration
+
+**Environment Variables**
+- `ENABLE_COLORS`: Enable/disable colored output (default: true)
+- `OUTPUT_DIR`: Custom directory for CSV files (default: ./data/outputs)
+
+#### Testing
+
+**Test Script** (`test_enhanced_logging.py`)
+- Comprehensive test of all ConsoleLogger features
+- OrderLogger CSV generation test
+- Simulated trading loop with combined logging
+- Generates sample output files for verification
+
+#### Documentation
+
+**New Documentation**
+- `docs/ENHANCED_LOGGING.md`: Complete feature guide
+- Updated `docs/LIVE_TRADING.md`: Monitoring section with examples
+- Console output examples with color coding
+- CSV file format specifications
+- Usage examples and troubleshooting
+
+#### Benefits
+
+**For Development & Testing**
+- Immediate visual feedback on bot actions
+- Easy debugging with color-coded output
+- Complete audit trail in CSV format
+
+**For Live Trading**
+- Clear visibility into all trading activities
+- Real-time PnL and position monitoring
+- Immediate alerts for critical events
+- Confidence through transparency
+
+**For Analysis**
+- Structured data for easy analysis
+- Session-based tracking
+- Detailed metrics (win rate, avg PnL, fees)
+- Export-friendly CSV format
+
+### Changed
+- Updated `main.py` to use ConsoleLogger and OrderLogger
+- Enhanced `_place_orders()` method with detailed logging
+- Enhanced `_fill_order()` method with PnL display
+- Added position display in trading loop
+- Improved error handling and rejection logging
+
+### Fixed
+- Order tracking now includes order type (GRID/DCA/TP)
+- Fill logging now calculates and displays PnL
+- Position display shows unrealized PnL
+- Session summary includes all relevant metrics
+
+### Migration
+- Fully backward compatible
+- No breaking changes
+- No new dependencies
+- Optional configuration via environment variables
 
 ## [1.3.0] - 2024-10-24
 
