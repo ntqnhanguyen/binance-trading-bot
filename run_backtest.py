@@ -95,26 +95,39 @@ class HybridBacktester:
             
             # Check hard stop
             if plan['sl_action']['stop']:
-                self.logger.critical(f"Hard stop triggered: {plan['sl_action']['reason']}")
-                self._close_all_positions(current_bar['close'])
-                break
+                # Hard stop triggered, but don't break - continue monitoring for auto-resume
+                if not hasattr(self, '_hard_stop_logged') or not self._hard_stop_logged:
+                    self.logger.critical(f"Hard stop triggered: {plan['sl_action']['reason']}")
+                    self._close_all_positions(current_bar['close'])
+                    self._hard_stop_logged = True
+                # Continue to next bar to check for auto-resume
+                # No new orders will be placed while in hard stop
+            else:
+                # Hard stop not active or resumed
+                if hasattr(self, '_hard_stop_logged') and self._hard_stop_logged:
+                    self.logger.warning(f"Trading resumed from hard stop at ${current_bar['close']:.2f}")
+                    self._hard_stop_logged = False
             
-            # Execute orders based on state
-            if plan['pnl_gate_state'] == 'RUN':
-                # Full operation
-                if plan['kill_replace']:
-                    self._cancel_grid_orders()
+            # Execute orders based on state (only if not in hard stop)
+            if not plan['sl_action']['stop']:
+                if plan['pnl_gate_state'] == 'RUN':
+                    # Full operation
+                    if plan['kill_replace']:
+                        self._cancel_grid_orders()
+                    
+                    self._execute_orders(plan['grid_orders'], current_bar)
+                    self._execute_orders(plan['dca_orders'], current_bar)
+                    self._execute_orders(plan['tp_orders'], current_bar)
                 
-                self._execute_orders(plan['grid_orders'], current_bar)
-                self._execute_orders(plan['dca_orders'], current_bar)
-                self._execute_orders(plan['tp_orders'], current_bar)
-            
-            elif plan['pnl_gate_state'] == 'DEGRADED':
-                # Reduced operation
-                self._execute_orders(plan['dca_orders'], current_bar)
-                self._execute_orders(plan['tp_orders'], current_bar)
-            
-            # PAUSED: no new orders
+                elif plan['pnl_gate_state'] == 'DEGRADED':
+                    # Reduced operation
+                    self._execute_orders(plan['dca_orders'], current_bar)
+                    self._execute_orders(plan['tp_orders'], current_bar)
+                
+                # PAUSED: no new orders
+            else:
+                # Hard stop active: no new orders, just monitor
+                pass
             
             # Check pending orders for fills
             self._check_fills(current_bar)
@@ -379,6 +392,7 @@ class HybridBacktester:
         self.state_history.append({
             'timestamp': bar['timestamp'],
             'state': plan['pnl_gate_state'],
+            'hard_stop': plan['sl_action']['stop'],
             'band': plan['band'],
             'spread_pct': plan['spread_pct'],
             'grid_orders': len(plan['grid_orders']),
@@ -444,6 +458,26 @@ class HybridBacktester:
             for state, count in state_counts.items():
                 pct = (count / len(state_df)) * 100
                 print(f"  {state}: {count} bars ({pct:.1f}%)")
+            
+            # Hard stop stats
+            hard_stop_bars = state_df[state_df['hard_stop'] == True]
+            if len(hard_stop_bars) > 0:
+                print(f"\nHard Stop Events:")
+                print(f"  Total bars in hard stop: {len(hard_stop_bars)} ({len(hard_stop_bars)/len(state_df)*100:.1f}%)")
+                
+                # Find resume events (hard_stop changes from True to False)
+                resume_count = 0
+                for i in range(1, len(state_df)):
+                    if state_df.iloc[i-1]['hard_stop'] and not state_df.iloc[i]['hard_stop']:
+                        resume_count += 1
+                
+                if resume_count > 0:
+                    print(f"  Auto-resume events: {resume_count}")
+                    print(f"  Average time in hard stop: {len(hard_stop_bars)/resume_count:.0f} bars")
+                else:
+                    print(f"  No auto-resume (hard stop remained active)")
+            else:
+                print(f"\nNo hard stop events")
         
         print("\n" + "="*70)
         
