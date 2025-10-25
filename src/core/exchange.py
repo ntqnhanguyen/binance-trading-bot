@@ -315,9 +315,47 @@ class BinanceExchange:
             self.logger.error(f"Error getting order status: {e}")
             return None
     
+    def get_ticker(self, symbol: str) -> Optional[Dict]:
+        """
+        Get current ticker information (price, volume, etc.)
+        
+        Args:
+            symbol: Trading pair symbol
+            
+        Returns:
+            Ticker data dictionary with price, volume, etc.
+        """
+        if self.mode == 'backtest':
+            return None
+        
+        try:
+            # Get current price
+            price_ticker = self.client.get_symbol_ticker(symbol=symbol)
+            price = float(price_ticker['price'])
+            
+            # Get 24h stats
+            stats_ticker = self.client.get_ticker(symbol=symbol)
+            
+            return {
+                'symbol': symbol,
+                'price': price,
+                'bid': float(stats_ticker.get('bidPrice', price)),
+                'ask': float(stats_ticker.get('askPrice', price)),
+                'volume': float(stats_ticker.get('volume', 0)),
+                'quoteVolume': float(stats_ticker.get('quoteVolume', 0)),
+                'high': float(stats_ticker.get('highPrice', price)),
+                'low': float(stats_ticker.get('lowPrice', price)),
+                'priceChange': float(stats_ticker.get('priceChange', 0)),
+                'priceChangePercent': float(stats_ticker.get('priceChangePercent', 0))
+            }
+        
+        except BinanceAPIException as e:
+            self.logger.error(f"Error getting ticker for {symbol}: {e}")
+            return None
+    
     def get_24h_ticker(self, symbol: str) -> Optional[Dict]:
         """
-        Get 24-hour ticker statistics
+        Get 24-hour ticker statistics (alias for get_ticker)
         
         Args:
             symbol: Trading pair symbol
@@ -325,14 +363,5 @@ class BinanceExchange:
         Returns:
             24h ticker data
         """
-        if self.mode == 'backtest':
-            return None
-        
-        try:
-            ticker = self.client.get_ticker(symbol=symbol)
-            return ticker
-        
-        except BinanceAPIException as e:
-            self.logger.error(f"Error getting 24h ticker for {symbol}: {e}")
-            return None
+        return self.get_ticker(symbol)
 
