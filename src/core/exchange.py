@@ -329,28 +329,34 @@ class BinanceExchange:
             return None
         
         try:
-            # Get current price
-            price_ticker = self.client.get_symbol_ticker(symbol=symbol)
-            price = float(price_ticker['price'])
+            # Get 24h ticker stats (includes price)
+            ticker = self.client.get_ticker(symbol=symbol)
             
-            # Get 24h stats
-            stats_ticker = self.client.get_ticker(symbol=symbol)
+            # Handle different response formats (REST API vs WebSocket)
+            # REST API uses 'lastPrice', WebSocket uses 'price'
+            price = float(ticker.get('lastPrice') or ticker.get('price', 0))
             
             return {
                 'symbol': symbol,
                 'price': price,
-                'bid': float(stats_ticker.get('bidPrice', price)),
-                'ask': float(stats_ticker.get('askPrice', price)),
-                'volume': float(stats_ticker.get('volume', 0)),
-                'quoteVolume': float(stats_ticker.get('quoteVolume', 0)),
-                'high': float(stats_ticker.get('highPrice', price)),
-                'low': float(stats_ticker.get('lowPrice', price)),
-                'priceChange': float(stats_ticker.get('priceChange', 0)),
-                'priceChangePercent': float(stats_ticker.get('priceChangePercent', 0))
+                'bid': float(ticker.get('bidPrice', price)),
+                'ask': float(ticker.get('askPrice', price)),
+                'volume': float(ticker.get('volume', 0)),
+                'quoteVolume': float(ticker.get('quoteVolume', 0)),
+                'high': float(ticker.get('highPrice', price)),
+                'low': float(ticker.get('lowPrice', price)),
+                'priceChange': float(ticker.get('priceChange', 0)),
+                'priceChangePercent': float(ticker.get('priceChangePercent', 0)),
+                'openPrice': float(ticker.get('openPrice', price)),
+                'prevClosePrice': float(ticker.get('prevClosePrice', price)),
+                'weightedAvgPrice': float(ticker.get('weightedAvgPrice', price))
             }
         
         except BinanceAPIException as e:
             self.logger.error(f"Error getting ticker for {symbol}: {e}")
+            return None
+        except (KeyError, TypeError, ValueError) as e:
+            self.logger.error(f"Error parsing ticker for {symbol}: {e}")
             return None
     
     def get_24h_ticker(self, symbol: str) -> Optional[Dict]:
