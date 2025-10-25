@@ -588,10 +588,26 @@ class HybridTradingBot:
             )
     
     def _round_quantity(self, symbol: str, qty: float) -> float:
-        """Round quantity to exchange precision"""
-        # Simple rounding to 4 decimals
-        # TODO: Get actual lot size from exchange
-        return round(qty, 4)
+        """Round quantity to exchange lot size (step size)"""
+        # Different symbols have different lot sizes
+        # TODO: Get actual lot size from exchange info
+        
+        # Determine step size based on symbol
+        if 'BTC' in symbol:
+            step_size = 0.00001  # BTC: 5 decimals
+            decimals = 5
+        elif symbol in ['SOLUSDT', 'BNBUSDT', 'ADAUSDT', 'DOGEUSDT']:
+            step_size = 0.01  # Most altcoins: 2 decimals
+            decimals = 2
+        elif 'ETH' in symbol:
+            step_size = 0.0001  # ETH: 4 decimals
+            decimals = 4
+        else:
+            step_size = 0.01  # Default: 2 decimals
+            decimals = 2
+        
+        # Round to avoid floating point precision issues
+        return round(round(qty / step_size) * step_size, decimals)
     
     def _round_price(self, symbol: str, price: float) -> float:
         """Round price to exchange tick size"""
