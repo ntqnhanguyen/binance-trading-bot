@@ -56,3 +56,21 @@ clean:
 	rm -rf htmlcov
 	rm -rf .coverage
 
+
+# Hybrid Strategy Commands
+.PHONY: hybrid-backtest hybrid-run hybrid-paper
+
+hybrid-backtest:  ## Run hybrid strategy backtest
+@echo "Running hybrid strategy backtest..."
+python run_hybrid_backtest.py --symbol BTCUSDT --capital 10000 --data ./data/BTCUSDT_1m.csv
+
+hybrid-paper:  ## Run hybrid strategy in paper trading mode
+@echo "Starting hybrid strategy paper trading..."
+@cp .env.hybrid.example .env 2>/dev/null || true
+TRADING_MODE=paper python main_hybrid.py
+
+hybrid-run:  ## Run hybrid strategy live (REAL MONEY!)
+@echo "⚠️  WARNING: Running with REAL MONEY!"
+@read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ] || exit 1
+TRADING_MODE=mainnet python main_hybrid.py
+
