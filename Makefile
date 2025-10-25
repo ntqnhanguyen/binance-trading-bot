@@ -1,4 +1,4 @@
-.PHONY: help install test clean run backtest download-data setup-env test-api docker-build docker-run
+.PHONY: help install test clean run backtest download-data setup-env test-api testnet mainnet docker-build docker-run
 
 help:  ## Show this help message
 @echo "Available commands:"
@@ -28,7 +28,13 @@ run:  ## Run live trading bot
 python main.py
 
 paper:  ## Run paper trading
-TRADING_MODE=paper python main.py
+	TRADING_MODE=paper python main.py
+
+testnet:  ## Run on Binance Testnet
+	./scripts/run_live.sh --mode testnet
+
+mainnet:  ## Run on Binance Mainnet (REAL MONEY)
+	./scripts/run_live.sh --mode mainnet
 
 docker-build:  ## Build Docker image
 docker build -t binance-trading-bot .
