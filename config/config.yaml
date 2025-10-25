@@ -57,6 +57,14 @@ default_policy:
   resume_price_recovery_pct: 2.0 # Resume when price recovers 2% from stop price
   resume_cooldown_bars: 60       # Wait 60 bars (60 min for 1m) after stop before checking resume
   
+  # Order Management
+  order_max_age_seconds: 300  # Cancel orders older than 5 minutes
+  order_price_drift_threshold_pct: 2.0  # Cancel if price drifts >2% from order
+  order_cancel_on_volatility_spike: true  # Cancel on sudden volatility increase
+  order_volatility_spike_threshold: 1.5  # 1.5x normal volatility
+  order_cancel_on_rsi_reversal: true  # Cancel on RSI reversal signal
+  order_rsi_reversal_threshold: 20  # RSI change > 20 points
+  
   # Timeframe
   bar_timeframe: "1m"  # 1-minute bars
 

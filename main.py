@@ -161,6 +161,9 @@ class HybridTradingBot:
                     self.console.print_error(f"Error processing {symbol}: {e}")
                     self.logger.error(f"Error processing {symbol}: {e}", exc_info=True)
             
+            # Manage pending orders (cancel stale orders)
+            self._manage_pending_orders(current_prices)
+            
             # Check fills
             self._check_fills()
             
@@ -292,6 +295,7 @@ class HybridTradingBot:
                 # In paper/testnet mode, just track orders
                 if self.trading_mode == 'paper':
                     # Paper trading - just track
+                    order_id = f"PAPER_{int(datetime.now().timestamp() * 1000)}"
                     pending_order = {
                         'symbol': symbol,
                         'side': side,
@@ -299,6 +303,7 @@ class HybridTradingBot:
                         'qty': qty,
                         'tag': tag,
                         'order_type': order_type,
+                        'order_id': order_id,
                         'timestamp': datetime.now()
                     }
                     self.pending_orders[symbol].append(pending_order)
@@ -343,6 +348,19 @@ class HybridTradingBot:
                             raise Exception("Order creation failed - returned None")
                         
                         order_id = order_result.get('orderId', 'N/A')
+                        
+                        # Track order in pending_orders for testnet/mainnet
+                        pending_order = {
+                            'symbol': symbol,
+                            'side': side,
+                            'price': price,
+                            'qty': qty,
+                            'tag': tag,
+                            'order_type': order_type,
+                            'order_id': str(order_id),
+                            'timestamp': datetime.now()
+                        }
+                        self.pending_orders[symbol].append(pending_order)
                         
                         # Enhanced console logging
                         self.console.print_order_placed(
@@ -399,6 +417,157 @@ class HybridTradingBot:
             
             except Exception as e:
                 self.console.print_error(f"Error placing {order_type} order: {e}")
+    
+    def _manage_pending_orders(self, current_prices: Dict[str, float]):
+        """
+        Manage pending orders - cancel stale orders based on market conditions
+        
+        Cancellation criteria:
+        1. Time-based: Orders older than max_age_seconds
+        2. Price drift: Price moved too far from order
+        3. Volatility spike: Sudden increase in volatility
+        4. RSI reversal: Strong reversal signal
+        """
+        for symbol in self.symbols:
+            if symbol not in current_prices:
+                continue
+            
+            current_price = current_prices[symbol]
+            
+            # Get policy config
+            policy_cfg = self._get_policy_config(symbol)
+            
+            # Get order management settings
+            max_age = policy_cfg.get('order_max_age_seconds', 300)
+            price_drift_threshold = policy_cfg.get('order_price_drift_threshold_pct', 2.0)
+            cancel_on_volatility = policy_cfg.get('order_cancel_on_volatility_spike', True)
+            volatility_threshold = policy_cfg.get('order_volatility_spike_threshold', 1.5)
+            cancel_on_rsi_reversal = policy_cfg.get('order_cancel_on_rsi_reversal', True)
+            rsi_reversal_threshold = policy_cfg.get('order_rsi_reversal_threshold', 20)
+            
+            # Get current market signals
+            indicator_engine = self.indicator_engines.get(symbol)
+            if indicator_engine:
+                signals = indicator_engine.get_latest_signals()
+                current_rsi = signals.get('rsi', 50)
+                current_atr_pct = signals.get('atr_pct', 1.0)
+            else:
+                current_rsi = 50
+                current_atr_pct = 1.0
+            
+            # Track orders to cancel
+            orders_to_cancel = []
+            
+            for order in self.pending_orders[symbol]:
+                order_age = (datetime.now() - order['timestamp']).total_seconds()
+                order_price = order['price']
+                order_side = order['side']
+                order_tag = order.get('tag', '')
+                
+                cancel_reason = None
+                
+                # 1. Check time-based cancellation
+                if order_age > max_age:
+                    cancel_reason = f"Order age {order_age:.0f}s > {max_age}s"
+                
+                # 2. Check price drift
+                elif order_price > 0:
+                    price_drift_pct = abs(current_price - order_price) / order_price * 100
+                    if price_drift_pct > price_drift_threshold:
+                        cancel_reason = f"Price drift {price_drift_pct:.2f}% > {price_drift_threshold}%"
+                
+                # 3. Check volatility spike (only for grid orders)
+                elif cancel_on_volatility and 'grid' in order_tag.lower():
+                    # Get historical ATR for comparison
+                    if hasattr(self, '_last_atr_pct'):
+                        last_atr_pct = self._last_atr_pct.get(symbol, current_atr_pct)
+                        if current_atr_pct > last_atr_pct * volatility_threshold:
+                            cancel_reason = f"Volatility spike: {current_atr_pct:.2f}% > {last_atr_pct:.2f}% * {volatility_threshold}"
+                
+                # 4. Check RSI reversal
+                elif cancel_on_rsi_reversal:
+                    # Store initial RSI when order was placed
+                    if 'initial_rsi' not in order:
+                        order['initial_rsi'] = current_rsi
+                    else:
+                        rsi_change = abs(current_rsi - order['initial_rsi'])
+                        
+                        # Cancel BUY orders if RSI reversed from oversold
+                        if order_side == 'BUY' and order['initial_rsi'] < 40 and current_rsi > 60:
+                            if rsi_change > rsi_reversal_threshold:
+                                cancel_reason = f"RSI reversal: {order['initial_rsi']:.1f} -> {current_rsi:.1f}"
+                        
+                        # Cancel SELL orders if RSI reversed from overbought
+                        elif order_side == 'SELL' and order['initial_rsi'] > 60 and current_rsi < 40:
+                            if rsi_change > rsi_reversal_threshold:
+                                cancel_reason = f"RSI reversal: {order['initial_rsi']:.1f} -> {current_rsi:.1f}"
+                
+                # Cancel order if any condition met
+                if cancel_reason:
+                    orders_to_cancel.append((order, cancel_reason))
+            
+            # Cancel orders
+            for order, reason in orders_to_cancel:
+                self._cancel_order(symbol, order, reason)
+            
+            # Store current ATR for next iteration
+            if not hasattr(self, '_last_atr_pct'):
+                self._last_atr_pct = {}
+            self._last_atr_pct[symbol] = current_atr_pct
+    
+    def _cancel_order(self, symbol: str, order: dict, reason: str):
+        """
+        Cancel a pending order
+        
+        Args:
+            symbol: Trading pair
+            order: Order dict
+            reason: Cancellation reason
+        """
+        try:
+            order_id = order.get('order_id', 'N/A')
+            order_type = order.get('order_type', 'UNKNOWN')
+            side = order['side']
+            price = order['price']
+            qty = order['qty']
+            tag = order.get('tag', '')
+            
+            # Cancel on exchange (testnet/mainnet only)
+            if self.trading_mode != 'paper':
+                try:
+                    # Cancel on exchange
+                    success = self.exchange.cancel_order(symbol, int(order_id))
+                    if not success:
+                        self.logger.warning(f"Failed to cancel order {order_id} on exchange")
+                except Exception as e:
+                    self.logger.error(f"Error cancelling order {order_id}: {e}")
+            
+            # Remove from pending orders
+            if order in self.pending_orders[symbol]:
+                self.pending_orders[symbol].remove(order)
+            
+            # Log cancellation
+            self.console.print_warning(
+                f"🗑️  ORDER CANCELLED: {order_type} | {side} {qty:.4f} {symbol} @ ${price:.2f}  [{tag}]  Reason: {reason}"
+            )
+            
+            self.order_logger.log_order(
+                symbol=symbol,
+                order_type=side,
+                side='LONG' if side == 'BUY' else 'SHORT',
+                action='OPEN' if side == 'BUY' else 'CLOSE',
+                price=price,
+                quantity=qty,
+                status='CANCELLED',
+                strategy='Hybrid',
+                tag=tag,
+                reason=f"{order_type} - {reason}",
+                mode=self.trading_mode,
+                order_id=str(order_id)
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error in _cancel_order: {e}", exc_info=True)
     
     def _check_fills(self):
         """Check for filled orders"""
