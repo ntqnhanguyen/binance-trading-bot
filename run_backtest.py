@@ -50,6 +50,11 @@ class HybridBacktester:
         self.trades = []
         self.equity_curve = []
         self.state_history = []
+        self.total_fees = 0.0
+        
+        # Fee configuration
+        self.maker_fee_pct = 0.1  # 0.1% default
+        self.taker_fee_pct = 0.1  # 0.1% default
         
         self.logger.info(f"HybridBacktester initialized: {symbol}, capital=${initial_capital:,.2f}")
     
@@ -223,7 +228,13 @@ class HybridBacktester:
                 pos['qty'] = total_qty
                 pos['entry_price'] = avg_price
             
-            self.cash -= order_value
+            # Calculate and deduct fee
+            fee = order_value * (self.maker_fee_pct / 100)
+            self.cash -= (order_value + fee)
+            self.total_fees += fee
+            
+            # Calculate equity after trade
+            equity_after = self._calculate_equity(fill_price)
             
             # Log fill
             self.order_logger.log_fill(
@@ -234,6 +245,8 @@ class HybridBacktester:
                 action='OPEN',
                 price=fill_price,
                 quantity=qty,
+                fee=fee,
+                fee_asset='USDT',
                 strategy='HybridStrategy',
                 tag=order['tag']
             )
@@ -243,7 +256,9 @@ class HybridBacktester:
                 self.strategy_engine.notify_dca_fill(fill_price)
             
             self.logger.info(
-                f"✅ BUY filled: {qty:.4f} @ ${fill_price:.2f}, Value=${order_value:.2f} [{order['tag']}]"
+                f"✅ BUY filled: {qty:.4f} @ ${fill_price:.2f}, "
+                f"Value=${order_value:.2f}, Fee=${fee:.2f}, "
+                f"Equity=${equity_after:,.2f} [{order['tag']}]"
             )
         
         else:  # SELL
@@ -253,8 +268,16 @@ class HybridBacktester:
                 
                 if qty >= pos['qty']:
                     # Close entire position
-                    pnl = pos['qty'] * (fill_price - pos['entry_price'])
-                    self.cash += pos['qty'] * fill_price
+                    sell_value = pos['qty'] * fill_price
+                    fee = sell_value * (self.maker_fee_pct / 100)
+                    pnl_gross = pos['qty'] * (fill_price - pos['entry_price'])
+                    pnl_net = pnl_gross - fee  # Net PnL after fee
+                    
+                    self.cash += (sell_value - fee)
+                    self.total_fees += fee
+                    
+                    # Calculate equity after trade
+                    equity_after = self._calculate_equity(fill_price)
                     
                     # Record trade
                     self.trades.append({
@@ -263,14 +286,16 @@ class HybridBacktester:
                         'entry_price': pos['entry_price'],
                         'exit_price': fill_price,
                         'qty': pos['qty'],
-                        'pnl': pnl,
+                        'pnl_gross': pnl_gross,
+                        'pnl_net': pnl_net,
+                        'fee': fee,
                         'tag': order['tag']
                     })
                     
                     del self.positions[self.symbol]
                     
                     # Log fill
-                    pnl_pct = (pnl / (pos['qty'] * pos['entry_price'])) * 100
+                    pnl_pct = (pnl_net / (pos['qty'] * pos['entry_price'])) * 100
                     self.order_logger.log_fill(
                         symbol=self.symbol,
                         order_id=f"ORD_{timestamp}",
@@ -279,16 +304,19 @@ class HybridBacktester:
                         action='CLOSE',
                         price=fill_price,
                         quantity=pos['qty'],
-                        pnl=pnl,
+                        fee=fee,
+                        fee_asset='USDT',
+                        pnl=pnl_net,
                         pnl_pct=pnl_pct,
                         strategy='HybridStrategy',
                         tag=order['tag']
                     )
                     
-                    emoji = "🟢" if pnl > 0 else "🔴"
+                    emoji = "🟢" if pnl_net > 0 else "🔴"
                     self.logger.info(
                         f"{emoji} SELL filled (close): {pos['qty']:.4f} @ ${fill_price:.2f}, "
-                        f"PnL=${pnl:.2f} ({pnl_pct:+.2f}%) [{order['tag']}]"
+                        f"PnL=${pnl_net:.2f} ({pnl_pct:+.2f}%), Fee=${fee:.2f}, "
+                        f"Equity=${equity_after:,.2f} [{order['tag']}]"
                     )
                 else:
                     # Partial close
@@ -373,18 +401,23 @@ class HybridBacktester:
         trades_df = pd.DataFrame(self.trades)
         
         if len(trades_df) > 0:
-            winning_trades = trades_df[trades_df['pnl'] > 0]
-            losing_trades = trades_df[trades_df['pnl'] < 0]
+            # Use pnl_net (after fees) for metrics
+            winning_trades = trades_df[trades_df['pnl_net'] > 0]
+            losing_trades = trades_df[trades_df['pnl_net'] < 0]
             
             win_rate = (len(winning_trades) / len(trades_df)) * 100
-            avg_win = winning_trades['pnl'].mean() if len(winning_trades) > 0 else 0
-            avg_loss = losing_trades['pnl'].mean() if len(losing_trades) > 0 else 0
-            total_pnl = trades_df['pnl'].sum()
+            avg_win = winning_trades['pnl_net'].mean() if len(winning_trades) > 0 else 0
+            avg_loss = losing_trades['pnl_net'].mean() if len(losing_trades) > 0 else 0
+            total_pnl_gross = trades_df['pnl_gross'].sum()
+            total_pnl_net = trades_df['pnl_net'].sum()
+            total_trade_fees = trades_df['fee'].sum()
         else:
             win_rate = 0
             avg_win = 0
             avg_loss = 0
-            total_pnl = 0
+            total_pnl_gross = 0
+            total_pnl_net = 0
+            total_trade_fees = 0
         
         # Print report
         print("\n" + "="*70)
@@ -398,7 +431,10 @@ class HybridBacktester:
         print(f"Win Rate: {win_rate:.2f}%")
         print(f"Avg Win: ${avg_win:.2f}")
         print(f"Avg Loss: ${avg_loss:.2f}")
-        print(f"Total PnL: ${total_pnl:.2f}")
+        print(f"\nPnL (Gross): ${total_pnl_gross:.2f}")
+        print(f"Total Fees: ${self.total_fees:.2f}")
+        print(f"PnL (Net): ${total_pnl_net:.2f}")
+        print(f"Fee Impact: {(self.total_fees / self.initial_capital * 100):.2f}% of capital")
         
         # State distribution
         state_df = pd.DataFrame(self.state_history)

@@ -101,6 +101,13 @@ execution:
   retry_on_fail: true
   max_retries: 3
 
+# Trading Fees
+fees:
+  maker_fee_pct: 0.1    # Maker fee: 0.1% (default Binance)
+  taker_fee_pct: 0.1    # Taker fee: 0.1% (default Binance)
+  use_bnb_discount: false  # Use BNB for 25% discount
+  bnb_discount_pct: 25  # 25% discount with BNB
+
 # Logging
 logging:
   level: INFO  # DEBUG, INFO, WARNING, ERROR
