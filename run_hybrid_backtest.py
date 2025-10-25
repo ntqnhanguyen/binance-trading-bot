@@ -306,8 +306,14 @@ class HybridBacktester:
     
     def _generate_report(self):
         """Generate backtest report"""
-        final_equity = self._calculate_equity(self.equity_curve[-1]['price'])
-        total_return = ((final_equity - self.initial_capital) / self.initial_capital) * 100
+        # Check if we have any data
+        if not self.equity_curve:
+            self.logger.warning("No equity data recorded")
+            final_equity = self.initial_capital
+            total_return = 0.0
+        else:
+            final_equity = self._calculate_equity(self.equity_curve[-1]['price'])
+            total_return = ((final_equity - self.initial_capital) / self.initial_capital) * 100
         
         # Calculate metrics
         trades_df = pd.DataFrame(self.trades)
@@ -355,10 +361,11 @@ class HybridBacktester:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         
         # Save equity curve
-        equity_df = pd.DataFrame(self.equity_curve)
-        equity_file = f'./data/hybrid_backtest_equity_{timestamp}.csv'
-        equity_df.to_csv(equity_file, index=False)
-        print(f"\nEquity curve saved: {equity_file}")
+        if self.equity_curve:
+            equity_df = pd.DataFrame(self.equity_curve)
+            equity_file = f'./data/hybrid_backtest_equity_{timestamp}.csv'
+            equity_df.to_csv(equity_file, index=False)
+            print(f"\nEquity curve saved: {equity_file}")
         
         # Save trades
         if len(trades_df) > 0:
