@@ -125,6 +125,18 @@ class HybridStrategyEngine:
         # Bar timeframe (for cooldown calculation)
         self.bar_timeframe = self.policy_cfg.get('bar_timeframe', '1m')
         self._bar_seconds = self._parse_timeframe_to_seconds(self.bar_timeframe)
+        
+        # Auto-resume configuration
+        self.auto_resume_enabled = self.policy_cfg.get('auto_resume_enabled', True)
+        self.resume_rsi_threshold = self.policy_cfg.get('resume_rsi_threshold', 40)  # RSI > 40 = oversold recovery
+        self.resume_price_recovery_pct = self.policy_cfg.get('resume_price_recovery_pct', 2.0)  # Price recovers 2%
+        self.resume_cooldown_bars = self.policy_cfg.get('resume_cooldown_bars', 60)  # Wait 60 bars after stop
+        
+        # Hard stop tracking
+        self._hard_stop_active = False
+        self._hard_stop_timestamp = None
+        self._hard_stop_price = None
+        self._hard_stop_reason = None
     
     def _parse_timeframe_to_seconds(self, timeframe: str) -> int:
         """Parse timeframe string to seconds"""
@@ -541,18 +553,49 @@ class HybridStrategyEngine:
             else:
                 daily_pnl_pct = 0.0
             
-            # Check hard stop conditions
+            # Check if we're in hard stop state
+            if self._hard_stop_active:
+                # Check if we can resume
+                if self.auto_resume_enabled and self._can_resume(bar, ref_price):
+                    self.logger.warning(
+                        f"Auto-resume triggered: Good market signal detected. "
+                        f"Resuming trading from hard stop."
+                    )
+                    self._hard_stop_active = False
+                    self._hard_stop_timestamp = None
+                    self._hard_stop_price = None
+                    self._hard_stop_reason = None
+                    # Continue to normal gate evaluation
+                else:
+                    # Still in hard stop
+                    sl_action = {
+                        "stop": True,
+                        "reason": f"Hard stop active: {self._hard_stop_reason}"
+                    }
+                    return "PAUSED", sl_action
+            
+            # Check hard stop conditions (if not already stopped)
             if daily_pnl_pct <= self.hard_stop_daily_pnl_pct:
+                self._activate_hard_stop(
+                    timestamp=timestamp,
+                    price=ref_price,
+                    reason=f"Daily PnL {daily_pnl_pct:.2f}% <= {self.hard_stop_daily_pnl_pct}%"
+                )
                 sl_action = {
                     "stop": True,
-                    "reason": f"Daily PnL {daily_pnl_pct:.2f}% <= {self.hard_stop_daily_pnl_pct}%"
+                    "reason": self._hard_stop_reason
                 }
                 return "PAUSED", sl_action
             
             if gap_pct <= self.hard_stop_gap_pct:
+                self._activate_hard_stop(
+                    timestamp=timestamp,
+                    price=ref_price,
+                    reason=f"Gap {gap_pct:.2f}% <= {self.hard_stop_gap_pct}%"
+                )
                 sl_action = {
                     "stop": True,
-                    "reason": f"Gap {gap_pct:.2f}% <= {self.hard_stop_gap_pct}%"
+                    "reason": self._hard_stop_reason
                 }
                 return "PAUSED", sl_action
             
@@ -586,6 +629,90 @@ class HybridStrategyEngine:
         self._last_dca_fill_price = fill_price
         self.logger.info(f"DCA fill recorded at {fill_price:.2f}")
     
+    def _activate_hard_stop(self, timestamp: datetime, price: float, reason: str):
+        """
+        Activate hard stop
+        
+        Args:
+            timestamp: Time when hard stop triggered
+            price: Price when hard stop triggered
+            reason: Reason for hard stop
+        """
+        self._hard_stop_active = True
+        self._hard_stop_timestamp = timestamp
+        self._hard_stop_price = price
+        self._hard_stop_reason = reason
+        
+        self.logger.critical(
+            f"Hard stop activated: {reason} at price=${price:.2f}"
+        )
+    
+    def _can_resume(self, bar: Dict, current_price: float) -> bool:
+        """
+        Check if trading can resume after hard stop
+        
+        Conditions for resume:
+        1. Cooldown period passed (default 60 bars)
+        2. RSI recovered above threshold (default 40)
+        3. Price recovered by X% from stop price (default 2%)
+        
+        Args:
+            bar: Current bar with timestamp and indicators
+            current_price: Current market price
+            
+        Returns:
+            True if can resume, False otherwise
+        """
+        if not self._hard_stop_active or self._hard_stop_timestamp is None:
+            return False
+        
+        try:
+            # Get signals
+            signals = self.indicator_engine.latest()
+            if not signals:
+                return False
+            
+            # Check cooldown period
+            timestamp = bar['timestamp']
+            bars_since_stop = (timestamp - self._hard_stop_timestamp).total_seconds() / self._bar_seconds
+            
+            if bars_since_stop < self.resume_cooldown_bars:
+                self.logger.debug(
+                    f"Resume cooldown: {bars_since_stop:.0f}/{self.resume_cooldown_bars} bars"
+                )
+                return False
+            
+            # Check RSI recovery
+            rsi = signals.get('rsi', 50)
+            if rsi <= self.resume_rsi_threshold:
+                self.logger.debug(
+                    f"Resume RSI check: {rsi:.1f} <= {self.resume_rsi_threshold}"
+                )
+                return False
+            
+            # Check price recovery
+            if self._hard_stop_price is not None and self._hard_stop_price > 0:
+                price_change_pct = ((current_price - self._hard_stop_price) / self._hard_stop_price) * 100
+                
+                if price_change_pct < self.resume_price_recovery_pct:
+                    self.logger.debug(
+                        f"Resume price check: {price_change_pct:+.2f}% < {self.resume_price_recovery_pct}%"
+                    )
+                    return False
+            
+            # All conditions met
+            self.logger.info(
+                f"Resume conditions met: "
+                f"cooldown={bars_since_stop:.0f} bars, "
+                f"RSI={rsi:.1f}, "
+                f"price_recovery={price_change_pct:+.2f}%"
+            )
+            return True
+        
+        except Exception as e:
+            self.logger.error(f"Error checking resume conditions: {e}")
+            return False
+    
     def get_state(self) -> Dict:
         """
         Get current engine state
@@ -601,6 +728,10 @@ class HybridStrategyEngine:
             'last_dca_fill_price': self._last_dca_fill_price,
             'open_price_day': self._open_price_day,
             'equity_open': self._equity_open,
-            'last_date': self._last_date
+            'last_date': self._last_date,
+            'hard_stop_active': self._hard_stop_active,
+            'hard_stop_timestamp': self._hard_stop_timestamp,
+            'hard_stop_price': self._hard_stop_price,
+            'hard_stop_reason': self._hard_stop_reason
         }
 

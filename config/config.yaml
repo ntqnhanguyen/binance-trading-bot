@@ -51,6 +51,12 @@ default_policy:
   hard_stop_daily_pnl_pct: -5.0  # Hard stop at -5% daily PnL
   hard_stop_gap_pct: -8.0        # Hard stop at -8% gap
   
+  # Auto-Resume Configuration (after hard stop)
+  auto_resume_enabled: true      # Enable auto-resume after hard stop
+  resume_rsi_threshold: 40       # Resume when RSI > 40 (oversold recovery)
+  resume_price_recovery_pct: 2.0 # Resume when price recovers 2% from stop price
+  resume_cooldown_bars: 60       # Wait 60 bars (60 min for 1m) after stop before checking resume
+  
   # Timeframe
   bar_timeframe: "1m"  # 1-minute bars
 
