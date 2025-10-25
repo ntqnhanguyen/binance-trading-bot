@@ -134,7 +134,7 @@ class HybridTradingBot:
             for symbol in self.symbols:
                 try:
                     ticker = self.exchange.get_ticker(symbol)
-                    current_prices[symbol] = float(ticker['lastPrice'])
+                    current_prices[symbol] = float(ticker['price'])
                 except Exception as e:
                     self.console.print_error(f"Error getting ticker for {symbol}: {e}")
                     continue
@@ -401,7 +401,7 @@ class HybridTradingBot:
             # Paper trading - simulate fills
             for symbol in self.symbols:
                 try:
-                    current_price = float(self.exchange.get_ticker(symbol)['lastPrice'])
+                    current_price = float(self.exchange.get_ticker(symbol)['price'])
                     
                     filled_orders = []
                     for order in self.pending_orders[symbol]:
