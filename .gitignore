@@ -45,6 +45,14 @@ data/*.json
 data/*.db
 data/*.sqlite
 
+# Output files (keep structure, ignore content)
+data/outputs/*.csv
+data/outputs/*.json
+
+# Old backtest files (deprecated)
+data/hybrid_backtest_*.csv
+data/*_backtest_*.csv
+
 # Docker
 .dockerignore
 

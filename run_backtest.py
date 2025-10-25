@@ -414,27 +414,8 @@ class HybridBacktester:
         # Print order summary
         self.order_logger.print_summary()
         
-        # Save results
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        
-        # Save equity curve
-        if self.equity_curve:
-            equity_df = pd.DataFrame(self.equity_curve)
-            equity_file = f'./data/hybrid_backtest_equity_{timestamp}.csv'
-            equity_df.to_csv(equity_file, index=False)
-            print(f"\nEquity curve saved: {equity_file}")
-        
-        # Save trades
-        if len(trades_df) > 0:
-            trades_file = f'./data/hybrid_backtest_trades_{timestamp}.csv'
-            trades_df.to_csv(trades_file, index=False)
-            print(f"Trades saved: {trades_file}")
-        
-        # Save state history
-        if len(state_df) > 0:
-            state_file = f'./data/hybrid_backtest_states_{timestamp}.csv'
-            state_df.to_csv(state_file, index=False)
-            print(f"State history saved: {state_file}")
+        # Note: All detailed order/fill data is saved to data/outputs/ by OrderLogger
+        # No need to save duplicate files here
 
 
 def main():
