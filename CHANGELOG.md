@@ -14,6 +14,138 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance attribution by strategy
 - Database integration
 - Real-time dashboard
+- Orchestrator integration for Hybrid Strategy
+- Live trading with Hybrid Strategy
+
+## [1.3.0] - 2024-10-24
+
+### Added - Hybrid Strategy Engine (Option-A)
+
+**Advanced trading strategy combining Grid + DCA with dynamic spread, PnL Gate, and Stop-Loss.**
+
+#### Components
+
+**1. HybridStrategyEngine**
+- Main strategy engine implementing Option-A interface
+- `on_bar(bar, equity)` returns comprehensive plan dict
+- Dynamic spread calculation based on ATR% and RSI
+- Grid/DCA/TP order planning
+- PnL Gate state management
+- Stop-Loss evaluation
+
+**2. IndicatorEngine**
+- Technical indicator calculator and provider
+- RSI, ATR, EMA, Bollinger Bands
+- Caches latest signals for strategy consumption
+- Updates from OHLCV data
+
+**3. Configuration System**
+- YAML-based policy configuration
+- Default policy + pair-specific overrides
+- Risk management parameters
+- Execution settings
+
+#### Features
+
+**Dynamic Spread Calculation**
+- **Band selection** based on ATR%:
+  - near (ATR < 1.0%): 0.3% spread
+  - mid (ATR < 2.0%): 0.5% spread
+  - far (ATR >= 2.0%): 0.8% spread
+- **RSI adjustment**: ±10% based on RSI level
+- Tighter spread when oversold, wider when overbought
+
+**Grid Orders Planning**
+- Two-sided grid around reference price
+- Configurable levels per side (default: 3)
+- Kill & replace when price drifts >1%
+- Cooldown: 5 minutes between updates
+
+**DCA Orders Planning**
+- Trigger when RSI < 35 (oversold)
+- Optional EMA gate (price < EMA fast)
+- Cooldown: 5 bars between DCA orders
+- Min distance: 1% from last DCA fill
+- Price offset: 0.1% below market
+
+**TP Suggestions**
+- Trigger when RSI > 65 (overbought)
+- Price must be above EMA fast
+- TP spread varies by band (0.5% to 1.2%)
+- Trailing execution by Orchestrator
+
+**PnL Gate States**
+- **RUN**: Full operation (Gap > -3%, Daily PnL > -2%)
+- **DEGRADED**: Reduced operation (Gap -3% to -5%, PnL -2% to -4%)
+- **PAUSED**: No new orders (Gap < -5%, PnL < -4%)
+- **Hard Stop**: Daily PnL <= -5% OR Gap <= -8%
+
+**State Tracking**
+- Last grid reference price and timestamp
+- Last DCA timestamp and fill price
+- Day open price and equity for PnL calculation
+- Automatic daily reset
+
+#### Interface (Option-A)
+
+**Input:**
+```python
+on_bar(bar: Dict, equity: float) -> Dict
+```
+
+**Output Plan Dict:**
+```python
+{
+    "pnl_gate_state": "RUN" | "DEGRADED" | "PAUSED",
+    "sl_action": {"stop": bool, "reason": str},
+    "grid_orders": [{"side", "price", "tag"}, ...],
+    "dca_orders": [{"side", "price", "tag"}, ...],
+    "tp_orders": [{"side", "price", "tag"}, ...],
+    "band": "near" | "mid" | "far",
+    "spread_pct": float,
+    "ref_price": float,
+    "kill_replace": bool
+}
+```
+
+#### Configuration
+
+```yaml
+# config/hybrid_strategy.yaml
+default_policy:
+  use_dynamic_spread: true
+  band_near_threshold: 1.0
+  band_mid_threshold: 2.0
+  spread_near_pct: 0.3
+  spread_mid_pct: 0.5
+  spread_far_pct: 0.8
+  grid_enabled: true
+  dca_enabled: true
+  tp_enabled: true
+  gate_degraded_gap_pct: -3.0
+  hard_stop_daily_pnl_pct: -5.0
+
+pairs:
+  BTCUSDT:
+    spread_near_pct: 0.2
+    grid_levels_per_side: 4
+```
+
+#### Files
+- `src/strategies/hybrid_strategy_engine.py` - Main engine
+- `src/indicators/indicator_engine.py` - Indicator provider
+- `config/hybrid_strategy.yaml` - Configuration
+- `docs/HYBRID_STRATEGY.md` - Complete documentation
+- `test_hybrid_strategy.py` - Test suite
+
+#### Benefits
+- ✅ Combines best of Grid and DCA strategies
+- ✅ Adapts to market volatility automatically
+- ✅ Risk management via PnL Gate
+- ✅ Portfolio-level stop-loss
+- ✅ Configurable per trading pair
+- ✅ Clean separation of concerns
+- ✅ Ready for orchestrator integration
 
 ## [1.2.0] - 2024-10-24
 
