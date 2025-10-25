@@ -44,11 +44,8 @@ class HybridTradingBot:
             self.config_path = yaml.safe_load(f)
         
         # Initialize exchange
-        self.exchange = BinanceExchange(
-            api_key=os.getenv('BINANCE_API_KEY'),
-            api_secret=os.getenv('BINANCE_API_SECRET'),
-            testnet=(os.getenv('TRADING_MODE', 'paper') == 'testnet')
-        )
+        trading_mode = os.getenv('TRADING_MODE', 'paper')
+        self.exchange = BinanceExchange(mode=trading_mode)
         
         # Initialize portfolio
         initial_capital = float(os.getenv('INITIAL_CAPITAL', '10000'))
