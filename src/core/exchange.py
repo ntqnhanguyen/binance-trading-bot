@@ -329,34 +329,69 @@ class BinanceExchange:
             return None
         
         try:
-            # Get 24h ticker stats (includes price)
+            # Get 24h ticker stats
             ticker = self.client.get_ticker(symbol=symbol)
             
-            # Handle different response formats (REST API vs WebSocket)
-            # REST API uses 'lastPrice', WebSocket uses 'price'
-            price = float(ticker.get('lastPrice') or ticker.get('price', 0))
+            # Debug: log available keys on first call
+            if not hasattr(self, '_ticker_keys_logged'):
+                self.logger.debug(f"Ticker keys for {symbol}: {list(ticker.keys())}")
+                self._ticker_keys_logged = True
+            
+            # Try multiple field names for price
+            price = None
+            for field in ['lastPrice', 'price', 'last', 'close']:
+                if field in ticker and ticker[field] is not None:
+                    try:
+                        price = float(ticker[field])
+                        break
+                    except (ValueError, TypeError):
+                        continue
+            
+            # If no price found, try get_symbol_ticker as fallback
+            if price is None or price == 0:
+                self.logger.warning(f"No price in get_ticker response, trying get_symbol_ticker")
+                price_ticker = self.client.get_symbol_ticker(symbol=symbol)
+                price = float(price_ticker.get('price', 0))
+            
+            if price == 0:
+                self.logger.error(f"Could not get price for {symbol}")
+                return None
+            
+            # Build response with safe field access
+            def safe_float(value, default=0.0):
+                if value is None:
+                    return default
+                try:
+                    return float(value)
+                except (ValueError, TypeError):
+                    return default
             
             return {
                 'symbol': symbol,
                 'price': price,
-                'bid': float(ticker.get('bidPrice', price)),
-                'ask': float(ticker.get('askPrice', price)),
-                'volume': float(ticker.get('volume', 0)),
-                'quoteVolume': float(ticker.get('quoteVolume', 0)),
-                'high': float(ticker.get('highPrice', price)),
-                'low': float(ticker.get('lowPrice', price)),
-                'priceChange': float(ticker.get('priceChange', 0)),
-                'priceChangePercent': float(ticker.get('priceChangePercent', 0)),
-                'openPrice': float(ticker.get('openPrice', price)),
-                'prevClosePrice': float(ticker.get('prevClosePrice', price)),
-                'weightedAvgPrice': float(ticker.get('weightedAvgPrice', price))
+                'bid': safe_float(ticker.get('bidPrice'), price),
+                'ask': safe_float(ticker.get('askPrice'), price),
+                'volume': safe_float(ticker.get('volume'), 0),
+                'quoteVolume': safe_float(ticker.get('quoteVolume'), 0),
+                'high': safe_float(ticker.get('highPrice') or ticker.get('high'), price),
+                'low': safe_float(ticker.get('lowPrice') or ticker.get('low'), price),
+                'priceChange': safe_float(ticker.get('priceChange'), 0),
+                'priceChangePercent': safe_float(ticker.get('priceChangePercent'), 0),
+                'openPrice': safe_float(ticker.get('openPrice') or ticker.get('open'), price),
+                'prevClosePrice': safe_float(ticker.get('prevClosePrice'), price),
+                'weightedAvgPrice': safe_float(ticker.get('weightedAvgPrice'), price)
             }
         
         except BinanceAPIException as e:
-            self.logger.error(f"Error getting ticker for {symbol}: {e}")
+            self.logger.error(f"Binance API error getting ticker for {symbol}: {e}")
             return None
-        except (KeyError, TypeError, ValueError) as e:
-            self.logger.error(f"Error parsing ticker for {symbol}: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error getting ticker for {symbol}: {type(e).__name__}: {e}")
+            # Log ticker response for debugging
+            try:
+                self.logger.debug(f"Ticker response: {ticker}")
+            except:
+                pass
             return None
     
     def get_24h_ticker(self, symbol: str) -> Optional[Dict]:
