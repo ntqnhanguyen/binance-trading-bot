@@ -264,9 +264,9 @@ class HybridTradingBot:
         
         for order in orders:
             try:
-                # Calculate quantity (1% of equity per order)
+                # Calculate quantity (2% of equity per order to meet minimum notional)
                 equity = self.portfolio.get_equity({symbol: current_price})
-                order_value = equity * 0.01
+                order_value = equity * 0.02  # Increased from 1% to 2% to meet $11 minimum
                 qty = order_value / order['price']
                 
                 # Round to exchange precision
@@ -274,7 +274,11 @@ class HybridTradingBot:
                 
                 # Check minimum order value
                 min_notional = 11.0  # Binance minimum
-                if qty * order['price'] < min_notional:
+                order_notional = qty * order['price']
+                if order_notional < min_notional:
+                    self.console.print_warning(
+                        f"Order skipped (too small): {qty:.4f} {symbol} @ ${order['price']:.2f} = ${order_notional:.2f} < ${min_notional}"
+                    )
                     self.logger.debug(
                         f"Order too small: {qty} * {order['price']} < {min_notional}"
                     )
@@ -624,7 +628,7 @@ def main():
     symbols = [s.strip() for s in symbols_str.split(',')]
     
     # Get config path
-    config_path = os.getenv('CONFIG_PATH', 'config/hybrid_strategy.yaml')
+    config_path = os.getenv('CONFIG_PATH', 'config/config.yaml')
     
     print("\n" + "="*80)
     print("HYBRID STRATEGY LIVE TRADING BOT v2.5.0")
