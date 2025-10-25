@@ -286,7 +286,7 @@ class HybridTradingBot:
                 
                 # Place order (limit order)
                 side = order['side']
-                price = order['price']
+                price = self._round_price(symbol, order['price'])  # Round price to tick size
                 tag = order.get('tag', '')
                 
                 # In paper/testnet mode, just track orders
@@ -337,6 +337,10 @@ class HybridTradingBot:
                             quantity=qty,
                             price=price
                         )
+                        
+                        # Check if order was created successfully
+                        if order_result is None:
+                            raise Exception("Order creation failed - returned None")
                         
                         order_id = order_result.get('orderId', 'N/A')
                         
@@ -588,6 +592,29 @@ class HybridTradingBot:
         # Simple rounding to 4 decimals
         # TODO: Get actual lot size from exchange
         return round(qty, 4)
+    
+    def _round_price(self, symbol: str, price: float) -> float:
+        """Round price to exchange tick size"""
+        # For most USDT pairs, tick size is 0.01
+        # For high-value pairs like BTC, might be 0.1 or 1.0
+        # TODO: Get actual tick size from exchange info
+        
+        # Determine tick size and decimal places based on price magnitude
+        if price >= 1000:
+            tick_size = 1.0  # BTC, ETH high prices
+            decimals = 0
+        elif price >= 100:
+            tick_size = 0.1  # SOL, BNB
+            decimals = 1
+        elif price >= 1:
+            tick_size = 0.01  # Most altcoins
+            decimals = 2
+        else:
+            tick_size = 0.0001  # Low price coins
+            decimals = 4
+        
+        # Round to avoid floating point precision issues
+        return round(round(price / tick_size) * tick_size, decimals)
     
     def stop(self):
         """Stop the trading bot"""
